@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jazz Forum Arts — Artist Offer Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f8f9fc;
+  --surface: #ffffff;
+  --surface-alt: #f1f3f9;
+  --border: #e2e6ef;
+  --border-light: #eef0f6;
+  --text-primary: #0f1729;
+  --text-secondary: #5b6478;
+  --text-muted: #8b93a7;
+  --accent: #3b5cff;
+  --accent-light: #eef1ff;
+  --accent-hover: #2d4ae0;
+  --green: #10b981; --green-bg: #ecfdf5;
+  --red: #ef4444; --red-bg: #fef2f2;
+  --yellow: #f59e0b; --yellow-bg: #fffbeb;
+  --shadow-sm: 0 1px 2px rgba(15,23,41,0.04);
+  --shadow-md: 0 4px 12px rgba(15,23,41,0.06);
+  --shadow-lg: 0 8px 30px rgba(15,23,41,0.08);
+  --radius: 12px; --radius-sm: 8px; --radius-xs: 6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text-primary);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-weight:400;font-size:14px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+.app{max-width:1280px;margin:0 auto;padding:32px 24px}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+.header-logo{width:44px;height:44px;border-radius:var(--radius-sm);background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.header-logo svg{width:24px;height:24px}
+.header-text h1{font-size:20px;font-weight:700;letter-spacing:-0.3px}
+.header-text .subtitle{font-size:13px;color:var(--text-muted);font-weight:400;margin-top:1px}
+
+.grid{display:grid;grid-template-columns:400px 1fr;gap:24px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:16px}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:16px}
+
+label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px;margin-top:14px}
+label:first-child{margin-top:0}
+input[type="text"],input[type="number"],input[type="time"],select,textarea{width:100%;padding:9px 12px;background:var(--surface-alt);color:var(--text-primary);border:1px solid var(--border);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;border-radius:var(--radius-xs);transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+textarea{resize:vertical;min-height:72px}
+input[type="number"]{font-family:'DM Mono',monospace;font-size:14px}
+input[type="range"]{-webkit-appearance:none;width:100%;height:6px;background:var(--border);border-radius:3px;border:none;padding:0;margin:8px 0}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:var(--accent);border-radius:50%;cursor:pointer;box-shadow:0 2px 6px rgba(59,92,255,0.3)}
+.row{display:flex;gap:10px}.row>div{flex:1}
+
+.check-group{display:flex;gap:8px;margin-top:6px}
+.check-item{flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-xs);cursor:pointer;transition:all .15s}
+.check-item:hover{border-color:var(--accent)}
+.check-item.active{border-color:var(--accent);background:var(--accent-light)}
+.check-item input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.check-item span{font-size:13px;font-weight:600}
+
+.deal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.deal-btn{padding:14px 12px;cursor:pointer;background:var(--surface-alt);color:var(--text-secondary);border:2px solid transparent;font-family:'Inter',sans-serif;font-weight:600;font-size:13px;text-align:left;border-radius:var(--radius-sm);transition:all .15s}
+.deal-btn:hover{border-color:var(--border)}
+.deal-btn.active{border-color:var(--accent);background:var(--accent-light);color:var(--accent)}
+.deal-btn .deal-sub{display:block;font-size:11px;font-weight:400;color:var(--text-muted);margin-top:2px}
+.deal-btn.active .deal-sub{color:var(--accent);opacity:0.7}
+
+.night-config{display:flex;gap:8px;margin-top:12px}
+.night-box{flex:1;background:var(--surface-alt);padding:14px;border-radius:var(--radius-sm);border:1px solid var(--border-light);text-align:center;transition:opacity .2s}
+.night-box.off{opacity:0.25;pointer-events:none}
+.night-box h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:8px}
+.night-box select{font-size:12px;padding:6px 8px;text-align:center}
+
+.expense-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+.expense-row input{flex:1}.expense-row .exp-name{min-width:110px;font-size:13px;font-weight:500;color:var(--text-secondary)}
+.expense-add{margin-top:12px;padding:8px 16px;width:100%;background:transparent;color:var(--accent);border:1px dashed var(--accent);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:var(--radius-xs);transition:background .15s}
+.expense-add:hover{background:var(--accent-light)}
+.expense-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:18px;padding:0 4px;line-height:1}
+
+.result-block{background:var(--surface-alt);border-radius:var(--radius-sm);padding:16px;margin-top:12px}
+.r-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0}
+.r-row+.r-row{border-top:1px solid var(--border-light)}
+.r-label{font-size:13px;color:var(--text-secondary)}
+.r-value{font-family:'DM Mono',monospace;font-size:14px;font-weight:500}
+.r-row.total{padding-top:12px;margin-top:4px;border-top:2px solid var(--accent)!important}
+.r-row.total .r-label{font-weight:700;color:var(--text-primary)}
+.r-row.total .r-value{font-weight:700;font-size:18px}
+
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px}
+.stat-card{background:var(--surface-alt);border-radius:var(--radius-sm);padding:14px 16px;text-align:center}
+.stat-card .stat-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:700;line-height:1.2}
+.stat-card .stat-lbl{font-size:11px;color:var(--text-muted);font-weight:500;margin-top:4px}
+
+.c-green{color:var(--green)!important}.c-red{color:var(--red)!important}.c-yellow{color:var(--yellow)!important}.c-accent{color:var(--accent)!important}
+.bg-green{background:var(--green-bg)!important}.bg-red{background:var(--red-bg)!important}.bg-yellow{background:var(--yellow-bg)!important}
+
+.deal-explain{font-size:13px;color:var(--text-secondary);line-height:1.6;padding:12px 14px;background:var(--accent-light);border-radius:var(--radius-xs);margin-top:12px;border-left:3px solid var(--accent)}
+.attendance-display{text-align:center;padding:8px 0}
+.attendance-display .big{font-family:'DM Mono',monospace;font-size:32px;font-weight:700;color:var(--accent);line-height:1}
+.attendance-display .sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+.expense-total{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface-alt);border-radius:var(--radius-xs);margin-top:14px;font-weight:600}
+.expense-total .et-val{font-family:'DM Mono',monospace;font-size:16px;color:var(--text-primary)}
+
+.btn-primary{display:block;width:100%;padding:14px 24px;background:var(--accent);color:#fff;border:none;font-family:'Inter',sans-serif;font-weight:700;font-size:14px;cursor:pointer;border-radius:var(--radius-sm);box-shadow:0 2px 8px rgba(59,92,255,0.25);transition:all .15s;margin-top:8px}
+.btn-primary:hover{background:var(--accent-hover);box-shadow:0 4px 16px rgba(59,92,255,0.3);transform:translateY(-1px)}
+.btn-secondary{display:block;width:100%;padding:14px 24px;background:var(--surface);color:var(--accent);border:2px solid var(--accent);font-family:'Inter',sans-serif;font-weight:700;font-size:14px;cursor:pointer;border-radius:var(--radius-sm);transition:all .15s;margin-top:8px}
+.btn-secondary:hover{background:var(--accent-light)}
+
+/* Backline list */
+.bl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.bl-item{display:flex;align-items:center;gap:6px;font-size:13px;padding:6px 10px;background:var(--surface-alt);border-radius:var(--radius-xs);color:var(--text-secondary)}
+.bl-item .bl-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+
+/* Email modal */
+.email-overlay{position:fixed;inset:0;background:rgba(15,23,41,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100}
+.email-modal{background:var(--surface);border-radius:var(--radius);padding:32px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.email-modal h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.email-modal .em-sub{font-size:13px;color:var(--text-muted);margin-bottom:16px}
+.email-modal pre{background:var(--surface-alt);padding:20px;border-radius:var(--radius-sm);font-family:'DM Mono',monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-wrap:break-word;color:var(--text-primary);border:1px solid var(--border);max-height:50vh;overflow-y:auto}
+.email-modal .em-actions{display:flex;gap:8px;margin-top:16px}
+.email-modal .em-actions button{flex:1}
+.copy-toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 24px;border-radius:var(--radius-sm);font-weight:600;font-size:13px;z-index:200;box-shadow:var(--shadow-lg);animation:fadeInUp .3s ease}
+@keyframes fadeInUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Print offer summary */
+.offer-summary{display:none;background:white;color:#1a1a2e;padding:56px;max-width:800px;margin:24px auto;font-family:'Inter',sans-serif}
+.offer-summary.visible{display:block}
+.offer-summary .os-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #3b5cff;padding-bottom:20px;margin-bottom:28px}
+.offer-summary .os-brand{font-size:18px;font-weight:800;letter-spacing:-0.3px;color:#3b5cff}
+.offer-summary .os-brand small{display:block;font-size:12px;color:#8b93a7;font-weight:400;letter-spacing:0;margin-top:2px}
+.offer-summary .os-date{font-size:12px;color:#8b93a7;text-align:right}
+.offer-summary .os-badge{display:inline-block;padding:4px 12px;background:#eef1ff;color:#3b5cff;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
+.offer-summary h2{font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:24px}
+.offer-summary h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#8b93a7;margin:24px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e6ef}
+.offer-summary table{width:100%;border-collapse:collapse;font-size:13px}
+.offer-summary td{padding:7px 0}
+.offer-summary td:last-child{text-align:right;font-weight:600;font-family:'DM Mono',monospace}
+.offer-summary .os-total td{border-top:2px solid #3b5cff;font-size:15px;font-weight:700;padding-top:12px}
+.offer-summary .os-footer{margin-top:48px;padding-top:16px;border-top:1px solid #e2e6ef;font-size:11px;color:#8b93a7;text-align:center;line-height:1.6}
+.offer-summary .os-notes{margin-top:20px;padding:16px;background:#f8f9fc;border-radius:8px;font-size:13px;color:#5b6478;line-height:1.6}
+.offer-summary .os-list{margin:0;padding:0 0 0 18px;font-size:13px;line-height:1.8}
+.offer-summary .os-list li{color:#5b6478}
+
+@media print{body{background:white}.app{display:none!important}.email-overlay{display:none!important}.offer-summary{display:block!important;box-shadow:none;padding:40px}}
+
+.tip{position:relative;display:inline-flex;align-items:center}
+.tip .tip-icon{width:16px;height:16px;line-height:16px;text-align:center;background:var(--border);color:var(--text-muted);font-size:10px;font-weight:700;border-radius:50%;margin-left:4px;cursor:help}
+.tip .tip-text{display:none;position:absolute;bottom:26px;left:-80px;width:220px;padding:10px 12px;background:var(--text-primary);color:#fff;font-size:12px;font-weight:400;border-radius:var(--radius-xs);z-index:10;box-shadow:var(--shadow-lg);line-height:1.5}
+.tip:hover .tip-text{display:block}
+
+.section-divider{height:1px;background:var(--border-light);margin:4px 0 14px}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="offer-summary" id="offerSummary"></div>
+<div id="emailModal"></div>
+<div id="toastArea"></div>
+
+<script>
+const S = {
+  artistName: '', agentName: '', showDate: '',
+  dealType: 'vs',
+  friday: true, saturday: true, sunday: true,
+  friSets: 2, satSets: 2, sunSets: 2,
+  seatsPerSet: 90,
+  // Set times
+  set1Time: '19:00', set2Time: '21:30', setLength: 70,
+  doorsTime: '17:50',
+  // Pricing
+  ticketPrice: 45, specialEvent: false, specialPrice: 125,
+  projectedAttendance: 85,
+  // Deal params
+  guarantee: 2000, artistPct: 70,
+  doorPct: 80,
+  plusPct: 70, plusGuarantee: 1500,
+  // Expenses
+  expenses: [
+    { name: 'Sound / Tech', amount: 300 },
+    { name: 'Hospitality', amount: 150 },
+    { name: 'Marketing', amount: 200 },
+  ],
+  customExpenses: [],
+  // Merch
+  merchEnabled: true, merchVenuePct: 25,
+  // Exclusivity
+  exclusivityEnabled: true, exclusivityDays: 60, exclusivityMiles: 15,
+  exclusivityExclude: "Dizzy's Club",
+  // Hospitality / Backline
+  backline: { steinway: true, bass: true, drums: true, sound: true },
+  dinner: true, greenRoom: true, hotelProvided: false,
+  soundcheck: true,
+  parking: true,
+  // Notes
+  notes: '',
+};
+
+const $ = id => document.getElementById(id);
+const money = n => (n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+const pct = n => n.toFixed(1)+'%';
+const fmt12 = t => { if(!t)return''; const [h,m]=t.split(':'); const hr=+h; return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`; };
+
+function calc() {
+  const nights = [];
+  if (S.friday) nights.push({day:'Friday',abbr:'Fri',sets:S.friSets});
+  if (S.saturday) nights.push({day:'Saturday',abbr:'Sat',sets:S.satSets});
+  if (S.sunday) nights.push({day:'Sunday',abbr:'Sun',sets:S.sunSets});
+  const price = S.specialEvent ? S.specialPrice : S.ticketPrice;
+  const totalSeats = nights.reduce((s,n)=>s+n.sets*S.seatsPerSet,0);
+  const projectedTickets = Math.round(totalSeats*S.projectedAttendance/100);
+  const grossPotential = totalSeats*price;
+  const projectedGross = projectedTickets*price;
+  const totalExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
+  let artistPay=0,dealLabel='',dealExplain='',dealEmailText='';
+  if(S.dealType==='flat'){
+    artistPay=+S.guarantee||0; dealLabel='Flat Guarantee';
+    dealExplain=`Fixed fee of <strong>${money(artistPay)}</strong> paid regardless of ticket sales.`;
+    dealEmailText=`$${artistPay.toLocaleString()} per night`;
+  }else if(S.dealType==='vs'){
+    const ps=projectedGross*(S.artistPct/100),g=+S.guarantee||0;
+    artistPay=Math.max(g,ps); dealLabel='VS Deal';
+    const w=ps>g?'percentage wins':'guarantee wins';
+    dealExplain=`<strong>${money(g)}</strong> guarantee <em>vs</em> <strong>${S.artistPct}%</strong> of gross (<strong>${money(ps)}</strong>). <strong>${w}</strong>.`;
+    dealEmailText=`$${g.toLocaleString()} vs. ${S.artistPct}% of net box office, whichever is greater`;
+  }else if(S.dealType==='door'){
+    artistPay=projectedGross*(S.doorPct/100); dealLabel='Door Split';
+    dealExplain=`No guarantee. Artist receives <strong>${S.doorPct}%</strong> of gross ticket revenue.`;
+    dealEmailText=`${S.doorPct}/${100-S.doorPct} split in favor of the artist after expenses`;
+  }else if(S.dealType==='plus'){
+    const g=+S.plusGuarantee||0,be=g+totalExpenses,ov=Math.max(0,projectedGross-be),bonus=ov*(S.plusPct/100);
+    artistPay=g+bonus; dealLabel='Plus Deal';
+    dealExplain=`<strong>${money(g)}</strong> guarantee <em>plus</em> <strong>${S.plusPct}%</strong> above breakeven (<strong>${money(be)}</strong>). Bonus: <strong>${money(bonus)}</strong>.`;
+    dealEmailText=`$${g.toLocaleString()} guarantee + ${S.plusPct}% of net box office above breakeven`;
+  }
+  const venueCost=artistPay+totalExpenses,venueNet=projectedGross-venueCost;
+  const breakeven=price>0?Math.ceil(venueCost/price):0;
+  const breakevenPct=totalSeats>0?(breakeven/totalSeats*100):0;
+  const perTicketCost=projectedTickets>0?venueCost/projectedTickets:0;
+  const margin=projectedGross>0?(venueNet/projectedGross*100):0;
+  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin};
+}
+
+function render(){
+  const c=calc();
+  const netClass=c.venueNet>=0?'c-green':'c-red';
+  const bkClass=c.breakevenPct>90?'c-red':c.breakevenPct>75?'c-yellow':'c-green';
+  const bkBg=c.breakevenPct>90?'bg-red':c.breakevenPct>75?'bg-yellow':'bg-green';
+  const marginClass=c.margin>=0?'c-green':'c-red';
+
+  $('app').innerHTML=`
+    <div class="header">
+      <div class="header-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <div class="header-text">
+        <h1>Artist Offer Calculator</h1>
+        <div class="subtitle">Jazz Forum Arts &middot; 90 Seats &middot; Tarrytown, NY</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- ═══ LEFT ═══ -->
+      <div>
+        <div class="card">
+          <div class="card-title">Artist Details</div>
+          <label>Artist / Band</label>
+          <input type="text" value="${esc(S.artistName)}" data-f="artistName" onchange="uf(this)" placeholder="e.g. Champian Fulton Trio">
+          <label>Agent / Contact</label>
+          <input type="text" value="${esc(S.agentName)}" data-f="agentName" onchange="uf(this)" placeholder="Optional">
+          <label>Date(s)</label>
+          <input type="text" value="${esc(S.showDate)}" data-f="showDate" onchange="uf(this)" placeholder="e.g. Mar 21-22, 2026">
+        </div>
+
+        <div class="card">
+          <div class="card-title">Show Schedule</div>
+          <div class="check-group">
+            <div class="check-item ${S.friday?'active':''}" onclick="S.friday=!S.friday;render()"><input type="checkbox" ${S.friday?'checked':''} onclick="event.stopPropagation();S.friday=this.checked;render()"><span>Fri</span></div>
+            <div class="check-item ${S.saturday?'active':''}" onclick="S.saturday=!S.saturday;render()"><input type="checkbox" ${S.saturday?'checked':''} onclick="event.stopPropagation();S.saturday=this.checked;render()"><span>Sat</span></div>
+            <div class="check-item ${S.sunday?'active':''}" onclick="S.sunday=!S.sunday;render()"><input type="checkbox" ${S.sunday?'checked':''} onclick="event.stopPropagation();S.sunday=this.checked;render()"><span>Sun</span></div>
+          </div>
+          <div class="night-config">
+            <div class="night-box ${S.friday?'':'off'}"><h4>Fri</h4><select onchange="S.friSets=+this.value;render()"><option value="1" ${S.friSets===1?'selected':''}>1 set</option><option value="2" ${S.friSets===2?'selected':''}>2 sets</option></select></div>
+            <div class="night-box ${S.saturday?'':'off'}"><h4>Sat</h4><select onchange="S.satSets=+this.value;render()"><option value="1" ${S.satSets===1?'selected':''}>1 set</option><option value="2" ${S.satSets===2?'selected':''}>2 sets</option></select></div>
+            <div class="night-box ${S.sunday?'':'off'}"><h4>Sun</h4><select onchange="S.sunSets=+this.value;render()"><option value="1" ${S.sunSets===1?'selected':''}>1 set</option><option value="2" ${S.sunSets===2?'selected':''}>2 sets</option></select></div>
+          </div>
+          <label>Seats per set</label>
+          <input type="number" value="${S.seatsPerSet}" onchange="S.seatsPerSet=+this.value;render()">
+
+          <div class="section-divider"></div>
+          <div class="card-title" style="margin-top:0">Set Times</div>
+          <div class="row">
+            <div><label>Set 1</label><input type="time" value="${S.set1Time}" onchange="S.set1Time=this.value;render()"></div>
+            <div><label>Set 2</label><input type="time" value="${S.set2Time}" onchange="S.set2Time=this.value;render()"></div>
+            <div><label>Length (min)</label><input type="number" value="${S.setLength}" onchange="S.setLength=+this.value;render()"></div>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <div><label>Doors</label><input type="time" value="${S.doorsTime}" onchange="S.doorsTime=this.value;render()"></div>
+            <div></div><div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Ticket Pricing</div>
+          <label>Price per ticket</label>
+          <input type="number" value="${S.ticketPrice}" onchange="S.ticketPrice=+this.value;render()" style="font-size:18px;padding:12px">
+          <div class="check-group" style="margin-top:12px">
+            <div class="check-item ${S.specialEvent?'active':''}" onclick="S.specialEvent=!S.specialEvent;render()"><input type="checkbox" ${S.specialEvent?'checked':''} onclick="event.stopPropagation();S.specialEvent=this.checked;render()"><span>Special event pricing</span></div>
+          </div>
+          ${S.specialEvent?`<label>Special event price</label><input type="number" value="${S.specialPrice}" onchange="S.specialPrice=+this.value;render()">`:''}
+          <label>Projected attendance <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Expected % of seats sold. 85% is typical for JFA weekends.</span></span></label>
+          <input type="range" min="30" max="100" value="${S.projectedAttendance}" oninput="S.projectedAttendance=+this.value;render()">
+          <div class="attendance-display"><div class="big">${S.projectedAttendance}%</div><div class="sub">${c.projectedTickets} of ${c.totalSeats} seats</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Venue Expenses</div>
+          ${S.expenses.map((e,i)=>`<div class="expense-row"><span class="exp-name">${e.name}</span><input type="number" value="${e.amount}" onchange="S.expenses[${i}].amount=+this.value;render()"></div>`).join('')}
+          ${S.customExpenses.map((e,i)=>`<div class="expense-row"><input type="text" value="${esc(e.name)}" onchange="S.customExpenses[${i}].name=this.value" placeholder="Name" style="max-width:110px"><input type="number" value="${e.amount}" onchange="S.customExpenses[${i}].amount=+this.value;render()"><button class="expense-remove" onclick="S.customExpenses.splice(${i},1);render()">&times;</button></div>`).join('')}
+          <button class="expense-add" onclick="S.customExpenses.push({name:'',amount:0});render()">+ Add line item</button>
+          <div class="expense-total"><span>Total</span><span class="et-val">${money(c.totalExpenses)}</span></div>
+        </div>
+
+        <!-- Merch & Terms -->
+        <div class="card">
+          <div class="card-title">Merch &amp; Terms</div>
+          <div class="check-item ${S.merchEnabled?'active':''}" onclick="S.merchEnabled=!S.merchEnabled;render()" style="margin-bottom:8px">
+            <input type="checkbox" ${S.merchEnabled?'checked':''} onclick="event.stopPropagation();S.merchEnabled=this.checked;render()">
+            <span>Merch sales at venue</span>
+          </div>
+          ${S.merchEnabled?`
+          <label>Venue commission %</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="range" min="0" max="50" value="${S.merchVenuePct}" oninput="S.merchVenuePct=+this.value;render()" style="flex:1">
+            <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);min-width:48px;text-align:right">${S.merchVenuePct}%</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Artist keeps ${100-S.merchVenuePct}% &middot; JFA keeps ${S.merchVenuePct}%</div>
+          `:''}
+
+          <div class="section-divider" style="margin-top:16px"></div>
+          <div class="card-title" style="margin-top:0">Exclusivity Clause</div>
+          <div class="check-item ${S.exclusivityEnabled?'active':''}" onclick="S.exclusivityEnabled=!S.exclusivityEnabled;render()" style="margin-bottom:8px">
+            <input type="checkbox" ${S.exclusivityEnabled?'checked':''} onclick="event.stopPropagation();S.exclusivityEnabled=this.checked;render()">
+            <span>Radius clause</span>
+          </div>
+          ${S.exclusivityEnabled?`
+          <div class="row">
+            <div><label>Days</label><input type="number" value="${S.exclusivityDays}" onchange="S.exclusivityDays=+this.value;render()"></div>
+            <div><label>Miles</label><input type="number" value="${S.exclusivityMiles}" onchange="S.exclusivityMiles=+this.value;render()"></div>
+          </div>
+          <label>Exclude venue(s)</label>
+          <input type="text" value="${esc(S.exclusivityExclude)}" onchange="S.exclusivityExclude=this.value;render()" placeholder="e.g. Dizzy's Club">
+          `:''}
+        </div>
+      </div>
+
+      <!-- ═══ RIGHT ═══ -->
+      <div>
+        <div class="card">
+          <div class="card-title">Deal Structure</div>
+          <div class="deal-grid">
+            <button class="deal-btn ${S.dealType==='flat'?'active':''}" onclick="S.dealType='flat';render()">Flat Guarantee<span class="deal-sub">Fixed fee</span></button>
+            <button class="deal-btn ${S.dealType==='vs'?'active':''}" onclick="S.dealType='vs';render()">VS Deal<span class="deal-sub">Guarantee vs %</span></button>
+            <button class="deal-btn ${S.dealType==='door'?'active':''}" onclick="S.dealType='door';render()">Door Split<span class="deal-sub">Straight % of revenue</span></button>
+            <button class="deal-btn ${S.dealType==='plus'?'active':''}" onclick="S.dealType='plus';render()">Plus Deal<span class="deal-sub">Guarantee + % over break</span></button>
+          </div>
+          ${S.dealType==='flat'?`<label>Guarantee amount</label><input type="number" value="${S.guarantee}" onchange="S.guarantee=+this.value;render()" style="font-size:18px;padding:12px">`:''}
+          ${S.dealType==='vs'?`<div class="row"><div><label>Guarantee</label><input type="number" value="${S.guarantee}" onchange="S.guarantee=+this.value;render()"></div><div><label>Artist % of gross</label><div style="display:flex;align-items:center;gap:10px;margin-top:2px"><input type="range" min="50" max="95" value="${S.artistPct}" oninput="S.artistPct=+this.value;render()" style="flex:1"><span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);min-width:48px;text-align:right">${S.artistPct}%</span></div></div></div>`:''}
+          ${S.dealType==='door'?`<label>Artist % of gross revenue</label><div style="display:flex;align-items:center;gap:10px;margin-top:2px"><input type="range" min="50" max="100" value="${S.doorPct}" oninput="S.doorPct=+this.value;render()" style="flex:1"><span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);min-width:48px;text-align:right">${S.doorPct}%</span></div>`:''}
+          ${S.dealType==='plus'?`<div class="row"><div><label>Guarantee</label><input type="number" value="${S.plusGuarantee}" onchange="S.plusGuarantee=+this.value;render()"></div><div><label>% above breakeven</label><div style="display:flex;align-items:center;gap:10px;margin-top:2px"><input type="range" min="50" max="95" value="${S.plusPct}" oninput="S.plusPct=+this.value;render()" style="flex:1"><span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);min-width:48px;text-align:right">${S.plusPct}%</span></div></div></div>`:''}
+          <div class="deal-explain">${c.dealExplain}</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Revenue Projection</div>
+          <div class="result-block">
+            <div class="r-row"><span class="r-label">Ticket price</span><span class="r-value">${money(c.price)}</span></div>
+            <div class="r-row"><span class="r-label">Total capacity (${c.nights.map(n=>n.abbr).join(' + ')})</span><span class="r-value">${c.totalSeats} seats</span></div>
+            <div class="r-row"><span class="r-label">Gross potential (sold out)</span><span class="r-value">${money(c.grossPotential)}</span></div>
+            <div class="r-row total"><span class="r-label">Projected gross at ${S.projectedAttendance}%</span><span class="r-value c-accent">${money(c.projectedGross)}</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">${c.dealLabel} — Artist Payment</div>
+          <div class="result-block"><div class="r-row total"><span class="r-label">Artist receives</span><span class="r-value">${money(c.artistPay)}</span></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Venue P&amp;L</div>
+          <div class="result-block">
+            <div class="r-row"><span class="r-label">Projected gross</span><span class="r-value">${money(c.projectedGross)}</span></div>
+            <div class="r-row"><span class="r-label">Artist payment</span><span class="r-value c-red">-${money(c.artistPay)}</span></div>
+            <div class="r-row"><span class="r-label">Venue expenses</span><span class="r-value c-red">-${money(c.totalExpenses)}</span></div>
+            <div class="r-row total"><span class="r-label">Venue net</span><span class="r-value ${netClass}">${money(c.venueNet)}</span></div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-card ${bkBg}"><div class="stat-val ${bkClass}">${c.breakeven}</div><div class="stat-lbl">Breakeven tix (${pct(c.breakevenPct)})</div></div>
+            <div class="stat-card"><div class="stat-val">${money(c.perTicketCost)}</div><div class="stat-lbl">Cost per ticket</div></div>
+            <div class="stat-card ${c.margin>=0?'bg-green':'bg-red'}"><div class="stat-val ${marginClass}">${pct(c.margin)}</div><div class="stat-lbl">Margin</div></div>
+          </div>
+        </div>
+
+        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100);return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nt*c.price)}</span></div>`;}).join('')}</div></div>`:''}
+
+        <!-- Backline & Hospitality -->
+        <div class="card">
+          <div class="card-title">Backline &amp; Hospitality</div>
+          <div class="bl-grid">
+            <div class="bl-item" onclick="S.backline.steinway=!S.backline.steinway;render()" style="cursor:pointer;opacity:${S.backline.steinway?1:0.4}"><div class="bl-dot" style="background:${S.backline.steinway?'var(--green)':'var(--border)'}"></div>Steinway B Piano</div>
+            <div class="bl-item" onclick="S.backline.bass=!S.backline.bass;render()" style="cursor:pointer;opacity:${S.backline.bass?1:0.4}"><div class="bl-dot" style="background:${S.backline.bass?'var(--green)':'var(--border)'}"></div>Bass &amp; Amp</div>
+            <div class="bl-item" onclick="S.backline.drums=!S.backline.drums;render()" style="cursor:pointer;opacity:${S.backline.drums?1:0.4}"><div class="bl-dot" style="background:${S.backline.drums?'var(--green)':'var(--border)'}"></div>Drum Kit (Canopus)</div>
+            <div class="bl-item" onclick="S.backline.sound=!S.backline.sound;render()" style="cursor:pointer;opacity:${S.backline.sound?1:0.4}"><div class="bl-dot" style="background:${S.backline.sound?'var(--green)':'var(--border)'}"></div>Sound System</div>
+          </div>
+          <div class="section-divider" style="margin-top:14px"></div>
+          <div class="check-group" style="margin-top:0">
+            <div class="check-item ${S.dinner?'active':''}" onclick="S.dinner=!S.dinner;render()" style="padding:8px 10px"><input type="checkbox" ${S.dinner?'checked':''} onclick="event.stopPropagation();S.dinner=this.checked;render()"><span style="font-size:12px">Dinner</span></div>
+            <div class="check-item ${S.greenRoom?'active':''}" onclick="S.greenRoom=!S.greenRoom;render()" style="padding:8px 10px"><input type="checkbox" ${S.greenRoom?'checked':''} onclick="event.stopPropagation();S.greenRoom=this.checked;render()"><span style="font-size:12px">Green Room</span></div>
+            <div class="check-item ${S.hotelProvided?'active':''}" onclick="S.hotelProvided=!S.hotelProvided;render()" style="padding:8px 10px"><input type="checkbox" ${S.hotelProvided?'checked':''} onclick="event.stopPropagation();S.hotelProvided=this.checked;render()"><span style="font-size:12px">Hotel</span></div>
+          </div>
+          <div class="check-group" style="margin-top:6px">
+            <div class="check-item ${S.soundcheck?'active':''}" onclick="S.soundcheck=!S.soundcheck;render()" style="padding:8px 10px"><input type="checkbox" ${S.soundcheck?'checked':''} onclick="event.stopPropagation();S.soundcheck=this.checked;render()"><span style="font-size:12px">Soundcheck</span></div>
+            <div class="check-item ${S.parking?'active':''}" onclick="S.parking=!S.parking;render()" style="padding:8px 10px"><input type="checkbox" ${S.parking?'checked':''} onclick="event.stopPropagation();S.parking=this.checked;render()"><span style="font-size:12px">Parking</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Offer Notes</div>
+          <textarea onchange="S.notes=this.value" placeholder="Additional terms, rider requests, travel arrangements...">${esc(S.notes)}</textarea>
+        </div>
+
+        <button class="btn-primary" onclick="generateEmail()">Generate Email Offer</button>
+        <button class="btn-secondary" onclick="generatePrint()">Print / PDF Summary</button>
+      </div>
+    </div>`;
+}
+
+function esc(s){return(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+window.uf=function(el){S[el.dataset.f]=el.value;render()};
+
+// ── Email Generator ──
+window.generateEmail=function(){
+  const c=calc();
+  const artist=S.artistName||'[Artist Name]';
+  const agent=S.agentName||'[Agent Name]';
+  const dates=S.showDate||'[Dates]';
+  const nightsCount=c.nights.length;
+  const setsPerNight=c.nights.length>0?c.nights[0].sets:2;
+
+  const backlineItems=[];
+  if(S.backline.steinway) backlineItems.push('Steinway B piano');
+  if(S.backline.bass) backlineItems.push('Bass & amp');
+  if(S.backline.drums) backlineItems.push('Drum kit (Canopus, 18" kick)');
+  if(S.backline.sound) backlineItems.push('Sound system provided');
+  if(S.dinner) backlineItems.push('Dinner provided between sets');
+  if(S.greenRoom) backlineItems.push('Green room with water, beer, wine');
+
+  const detailItems=[];
+  detailItems.push(`Doors: ${fmt12(S.doorsTime)}`);
+  if(S.soundcheck) detailItems.push('Soundcheck: coordinated in advance');
+  if(S.parking) detailItems.push('Parking available onsite');
+  if(S.hotelProvided) detailItems.push('Hotel provided');
+  else detailItems.push('No hotel provided unless otherwise agreed');
+
+  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${fmt12(S.set1Time)} & ${fmt12(S.set2Time)})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n$${c.price} per ticket\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
+
+  if(S.exclusivityEnabled){
+    email+=`\n\n\nExclusivity\n\nStandard ${S.exclusivityDays}-day radius clause (${S.exclusivityMiles} miles)${S.exclusivityExclude?`, excluding ${S.exclusivityExclude}`:''}`;
+  }
+
+  if(S.notes){
+    email+=`\n\n\nAdditional Notes\n\n${S.notes}`;
+  }
+
+  email+=`\n\nLet me know if this works for you and we can move forward with a contract.\n\nLooking forward to having you with us.\n\nBest,\nDarrian`;
+
+  $('emailModal').innerHTML=`
+    <div class="email-overlay" onclick="if(event.target===this)closeEmail()">
+      <div class="email-modal">
+        <h2>Email Offer</h2>
+        <div class="em-sub">Copy and paste into your email client</div>
+        <pre id="emailText">${escH(email)}</pre>
+        <div class="em-actions">
+          <button class="btn-primary" onclick="copyEmail()">Copy to Clipboard</button>
+          <button class="btn-secondary" onclick="closeEmail()">Close</button>
+        </div>
+      </div>
+    </div>`;
+};
+
+window.copyEmail=function(){
+  const text=$('emailText').innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    $('toastArea').innerHTML='<div class="copy-toast">Copied to clipboard!</div>';
+    setTimeout(()=>$('toastArea').innerHTML='',2500);
+  });
+};
+window.closeEmail=function(){$('emailModal').innerHTML='';};
+
+// ── Print Summary ──
+window.generatePrint=function(){
+  const c=calc();
+  const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const nightsText=c.nights.map(n=>`${n.day}: ${n.sets} set${n.sets>1?'s':''} (${n.sets*S.seatsPerSet} seats)`).join(' &middot; ');
+  const allExp=[...S.expenses,...S.customExpenses].filter(e=>e.amount>0);
+
+  const backlineList=[];
+  if(S.backline.steinway) backlineList.push('Steinway B piano');
+  if(S.backline.bass) backlineList.push('Bass & amp');
+  if(S.backline.drums) backlineList.push('Drum kit (Canopus, 18" kick)');
+  if(S.backline.sound) backlineList.push('Sound system provided');
+  if(S.dinner) backlineList.push('Dinner provided between sets');
+  if(S.greenRoom) backlineList.push('Green room with water, beer, wine');
+
+  $('offerSummary').innerHTML=`
+    <div class="os-header">
+      <div><div class="os-brand">Jazz Forum Arts<small>1 Dixon Lane, Tarrytown, NY 10591</small></div></div>
+      <div class="os-date"><span class="os-badge">Performance Offer</span><br><br>${today}</div>
+    </div>
+    <h2>${escH(S.artistName)||'Artist Name TBD'}</h2>
+
+    <h3>Performance Details</h3>
+    <table>
+      <tr><td>Artist</td><td style="font-family:Inter,sans-serif">${escH(S.artistName)||'TBD'}</td></tr>
+      <tr><td>Contact</td><td style="font-family:Inter,sans-serif">${escH(S.agentName)||'TBD'}</td></tr>
+      <tr><td>Date(s)</td><td style="font-family:Inter,sans-serif">${escH(S.showDate)||'TBD'}</td></tr>
+      <tr><td>Venue</td><td style="font-family:Inter,sans-serif">The Jazz Forum</td></tr>
+      <tr><td>Sets</td><td style="font-family:Inter,sans-serif">${S.setLength}-min sets at ${fmt12(S.set1Time)} &amp; ${fmt12(S.set2Time)}</td></tr>
+      <tr><td>Schedule</td><td style="font-family:Inter,sans-serif">${nightsText}</td></tr>
+      <tr><td>Capacity</td><td>${c.totalSeats} total (${S.seatsPerSet}/set)</td></tr>
+      <tr><td>Doors</td><td style="font-family:Inter,sans-serif">${fmt12(S.doorsTime)}</td></tr>
+    </table>
+
+    <h3>Compensation &mdash; ${c.dealLabel}</h3>
+    <table>
+      ${S.dealType==='flat'?`<tr><td>Flat Guarantee</td><td>${money(S.guarantee)}</td></tr>`:''}
+      ${S.dealType==='vs'?`<tr><td>Guarantee</td><td>${money(S.guarantee)}</td></tr><tr><td>OR ${S.artistPct}% of Gross Revenue</td><td style="font-family:Inter,sans-serif">Whichever is greater</td></tr>`:''}
+      ${S.dealType==='door'?`<tr><td>${S.doorPct}% of Gross Revenue</td><td style="font-family:Inter,sans-serif">No guarantee</td></tr>`:''}
+      ${S.dealType==='plus'?`<tr><td>Guarantee</td><td>${money(S.plusGuarantee)}</td></tr><tr><td>Plus ${S.plusPct}% Above Breakeven</td><td>${money(c.venueCost)}</td></tr>`:''}
+      <tr><td>Ticket Price</td><td>${money(c.price)}</td></tr>
+    </table>
+
+    <h3>Backline &amp; Hospitality</h3>
+    <ul class="os-list">${backlineList.map(b=>`<li>${b}</li>`).join('')}</ul>
+    ${S.hotelProvided?'<p style="margin-top:8px;font-size:13px;color:#5b6478">Hotel provided</p>':''}
+    ${S.parking?'<p style="margin-top:4px;font-size:13px;color:#5b6478">Parking available onsite</p>':''}
+
+    ${S.merchEnabled?`<h3>Merch</h3><table><tr><td>Venue sells artist merch</td><td style="font-family:Inter,sans-serif">${S.merchVenuePct}% commission to JFA</td></tr></table>`:''}
+
+    ${S.exclusivityEnabled?`<h3>Exclusivity</h3><table><tr><td>Radius clause</td><td style="font-family:Inter,sans-serif">${S.exclusivityDays} days / ${S.exclusivityMiles} miles${S.exclusivityExclude?`, excl. ${escH(S.exclusivityExclude)}`:''}</td></tr></table>`:''}
+
+    <h3>Financial Projection (${S.projectedAttendance}% Attendance)</h3>
+    <table>
+      <tr><td>Projected Tickets</td><td>${c.projectedTickets} of ${c.totalSeats}</td></tr>
+      <tr><td>Projected Gross</td><td>${money(c.projectedGross)}</td></tr>
+      <tr><td>Artist Payment</td><td>${money(c.artistPay)}</td></tr>
+      ${allExp.map(e=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(e.name)}</td><td style="color:#8b93a7">${money(e.amount)}</td></tr>`).join('')}
+      <tr><td>Venue Expenses</td><td>${money(c.totalExpenses)}</td></tr>
+      <tr class="os-total"><td>Venue Net</td><td style="color:${c.venueNet>=0?'#10b981':'#ef4444'}">${money(c.venueNet)}</td></tr>
+    </table>
+    <table style="margin-top:8px"><tr><td>Breakeven</td><td>${c.breakeven} tickets (${pct(c.breakevenPct)})</td></tr></table>
+
+    ${S.notes?`<h3>Additional Terms</h3><div class="os-notes">${escH(S.notes).replace(/\n/g,'<br>')}</div>`:''}
+
+    <div class="os-footer">Jazz Forum Arts &middot; 1 Dixon Lane, Tarrytown, NY 10591 &middot; jazzforumarts.org<br>This is a preliminary offer and is not a binding contract.</div>`;
+
+  $('offerSummary').classList.add('visible');
+  $('offerSummary').scrollIntoView({behavior:'smooth'});
+  setTimeout(()=>window.print(),600);
+};
+
+render();
+</script>
+</body>
+</html>
