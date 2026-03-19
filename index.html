@@ -184,7 +184,11 @@ const S = {
   ],
   customExpenses: [],
   // Merch
-  merchEnabled: true, merchVenuePct: 25, merchEstimatedSales: 300,
+  merchEnabled: true, merchVenuePct: 25,
+  merchItems: [
+    { name: 'CD', price: 15, qtyPerNight: 8 },
+    { name: 'Vinyl', price: 45, qtyPerNight: 3 },
+  ],
   // Exclusivity
   exclusivityEnabled: true, exclusivityDays: 60, exclusivityMiles: 15,
   exclusivityExclude: "Dizzy's Club",
@@ -213,9 +217,11 @@ function calc() {
   const grossPotential = totalSeats*price;
   const projectedGross = projectedTickets*price;
   const totalExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
-  const merchGross = S.merchEnabled ? (+S.merchEstimatedSales||0) * nights.length : 0;
+  const merchPerNight = S.merchEnabled ? S.merchItems.reduce((s,m)=>s+((+m.price||0)*(+m.qtyPerNight||0)),0) : 0;
+  const merchGross = merchPerNight * nights.length;
   const merchVenueRev = merchGross * (S.merchVenuePct/100);
   const merchArtistRev = merchGross - merchVenueRev;
+  const merchItemDetails = S.merchItems.map(m=>({name:m.name,price:+m.price||0,qty:+m.qtyPerNight||0,perNight:(+m.price||0)*(+m.qtyPerNight||0)}));
   let artistPay=0,dealLabel='',dealExplain='',dealEmailText='';
   if(S.dealType==='flat'){
     artistPay=+S.guarantee||0; dealLabel='Flat Guarantee';
@@ -244,7 +250,7 @@ function calc() {
   const breakevenPct=totalSeats>0?(breakeven/totalSeats*100):0;
   const perTicketCost=projectedTickets>0?venueCost/projectedTickets:0;
   const margin=totalVenueRevenue>0?(venueNet/totalVenueRevenue*100):0;
-  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchGross,merchVenueRev,merchArtistRev,totalVenueRevenue};
+  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue};
 }
 
 function render(){
@@ -341,10 +347,30 @@ function render(){
             <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);min-width:48px;text-align:right">${S.merchVenuePct}%</span>
           </div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Artist keeps ${100-S.merchVenuePct}% &middot; JFA keeps ${S.merchVenuePct}%</div>
-          <label>Estimated merch sales per night <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Rough estimate of total merch sales per show night (CDs, vinyl, etc). You won't know exact items until the artist arrives, but this helps with the P&L projection.</span></span></label>
-          <input type="number" value="${S.merchEstimatedSales}" onchange="S.merchEstimatedSales=+this.value;render()" placeholder="e.g. 300">
-          <div class="result-block" style="margin-top:10px">
-            <div class="r-row"><span class="r-label">Total merch (${c.nights.length} night${c.nights.length>1?'s':''})</span><span class="r-value">${money(c.merchGross)}</span></div>
+
+          <label style="margin-top:16px">Merch Items <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Add each item the artist is selling. Estimate how many you'll sell per night to project merch revenue in the P&L.</span></span></label>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:2;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Item</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Price</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Est. Qty/Night</div>
+            <div style="flex:0 0 28px"></div>
+          </div>
+          ${S.merchItems.map((m,i)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="text" value="${esc(m.name)}" onchange="S.merchItems[${i}].name=this.value" placeholder="e.g. CD" style="flex:2">
+            <input type="number" value="${m.price}" onchange="S.merchItems[${i}].price=+this.value;render()" placeholder="$" style="flex:1">
+            <input type="number" value="${m.qtyPerNight}" onchange="S.merchItems[${i}].qtyPerNight=+this.value;render()" placeholder="Qty" style="flex:1">
+            <button class="expense-remove" onclick="S.merchItems.splice(${i},1);render()" style="flex:0 0 28px">&times;</button>
+          </div>
+          `).join('')}
+          <button class="expense-add" onclick="S.merchItems.push({name:'',price:0,qtyPerNight:0});render()">+ Add merch item</button>
+
+          <div class="result-block" style="margin-top:12px">
+            ${c.merchItemDetails.filter(m=>m.perNight>0).map(m=>`
+            <div class="r-row"><span class="r-label">${escH(m.name)} (${m.qty} &times; ${money(m.price)})</span><span class="r-value">${money(m.perNight)}/night</span></div>
+            `).join('')}
+            <div class="r-row" style="font-weight:600"><span class="r-label">Merch per night</span><span class="r-value">${money(c.merchPerNight)}</span></div>
+            <div class="r-row"><span class="r-label">Total (${c.nights.length} night${c.nights.length>1?'s':''})</span><span class="r-value">${money(c.merchGross)}</span></div>
             <div class="r-row"><span class="r-label">Artist share (${100-S.merchVenuePct}%)</span><span class="r-value">${money(c.merchArtistRev)}</span></div>
             <div class="r-row" style="font-weight:600"><span class="r-label">JFA merch revenue (${S.merchVenuePct}%)</span><span class="r-value c-green">${money(c.merchVenueRev)}</span></div>
           </div>
@@ -561,7 +587,8 @@ window.generatePrint=function(){
     ${S.hotelProvided?'<p style="margin-top:8px;font-size:13px;color:#5b6478">Hotel provided</p>':''}
     ${S.parking?'<p style="margin-top:4px;font-size:13px;color:#5b6478">Parking available onsite</p>':''}
 
-    ${S.merchEnabled?`<h3>Merch</h3><table><tr><td>Venue sells artist merch</td><td style="font-family:Inter,sans-serif">${S.merchVenuePct}% commission to JFA</td></tr>${c.merchGross>0?`<tr><td>Est. merch sales (${c.nights.length} night${c.nights.length>1?'s':''})</td><td>${money(c.merchGross)}</td></tr><tr><td>Artist merch revenue</td><td>${money(c.merchArtistRev)}</td></tr><tr><td style="font-weight:700">JFA merch revenue</td><td style="font-weight:700;color:#10b981">${money(c.merchVenueRev)}</td></tr>`:''}</table>`:''}
+    ${S.merchEnabled?`<h3>Merch</h3><table><tr><td>Commission</td><td style="font-family:Inter,sans-serif">${S.merchVenuePct}% to JFA / ${100-S.merchVenuePct}% to artist</td></tr></table>${c.merchItemDetails.length>0?`<table style="margin-top:8px">${c.merchItemDetails.filter(m=>m.perNight>0).map(m=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(m.name)} (${m.qty} &times; ${money(m.price)})</td><td style="color:#8b93a7">${money(m.perNight)}/night</td></tr>`).join('')}<tr><td>Est. total merch (${c.nights.length} night${c.nights.length>1?'s':''})</td><td>${money(c.merchGross)}</td></tr><tr><td>Artist merch revenue</td><td>${money(c.merchArtistRev)}</td></tr><tr><td style="font-weight:700">JFA merch revenue</td><td style="font-weight:700;color:#10b981">${money(c.merchVenueRev)}</td></tr></table>`:''}`:''}
+
 
     ${S.exclusivityEnabled?`<h3>Exclusivity</h3><table><tr><td>Radius clause</td><td style="font-family:Inter,sans-serif">${S.exclusivityDays} days / ${S.exclusivityMiles} miles${S.exclusivityExclude?`, excl. ${escH(S.exclusivityExclude)}`:''}</td></tr></table>`:''}
 
