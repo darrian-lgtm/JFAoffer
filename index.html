@@ -184,7 +184,7 @@ const S = {
   ],
   customExpenses: [],
   // Merch
-  merchEnabled: true, merchVenuePct: 25,
+  merchEnabled: true, merchVenuePct: 25, merchEstimatedSales: 300,
   // Exclusivity
   exclusivityEnabled: true, exclusivityDays: 60, exclusivityMiles: 15,
   exclusivityExclude: "Dizzy's Club",
@@ -213,6 +213,9 @@ function calc() {
   const grossPotential = totalSeats*price;
   const projectedGross = projectedTickets*price;
   const totalExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
+  const merchGross = S.merchEnabled ? (+S.merchEstimatedSales||0) * nights.length : 0;
+  const merchVenueRev = merchGross * (S.merchVenuePct/100);
+  const merchArtistRev = merchGross - merchVenueRev;
   let artistPay=0,dealLabel='',dealExplain='',dealEmailText='';
   if(S.dealType==='flat'){
     artistPay=+S.guarantee||0; dealLabel='Flat Guarantee';
@@ -234,12 +237,14 @@ function calc() {
     dealExplain=`<strong>${money(g)}</strong> guarantee <em>plus</em> <strong>${S.plusPct}%</strong> above breakeven (<strong>${money(be)}</strong>). Bonus: <strong>${money(bonus)}</strong>.`;
     dealEmailText=`$${g.toLocaleString()} guarantee + ${S.plusPct}% of net box office above breakeven`;
   }
-  const venueCost=artistPay+totalExpenses,venueNet=projectedGross-venueCost;
+  const venueCost=artistPay+totalExpenses;
+  const totalVenueRevenue=projectedGross+merchVenueRev;
+  const venueNet=totalVenueRevenue-venueCost;
   const breakeven=price>0?Math.ceil(venueCost/price):0;
   const breakevenPct=totalSeats>0?(breakeven/totalSeats*100):0;
   const perTicketCost=projectedTickets>0?venueCost/projectedTickets:0;
-  const margin=projectedGross>0?(venueNet/projectedGross*100):0;
-  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin};
+  const margin=totalVenueRevenue>0?(venueNet/totalVenueRevenue*100):0;
+  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchGross,merchVenueRev,merchArtistRev,totalVenueRevenue};
 }
 
 function render(){
@@ -336,6 +341,13 @@ function render(){
             <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);min-width:48px;text-align:right">${S.merchVenuePct}%</span>
           </div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Artist keeps ${100-S.merchVenuePct}% &middot; JFA keeps ${S.merchVenuePct}%</div>
+          <label>Estimated merch sales per night <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Rough estimate of total merch sales per show night (CDs, vinyl, etc). You won't know exact items until the artist arrives, but this helps with the P&L projection.</span></span></label>
+          <input type="number" value="${S.merchEstimatedSales}" onchange="S.merchEstimatedSales=+this.value;render()" placeholder="e.g. 300">
+          <div class="result-block" style="margin-top:10px">
+            <div class="r-row"><span class="r-label">Total merch (${c.nights.length} night${c.nights.length>1?'s':''})</span><span class="r-value">${money(c.merchGross)}</span></div>
+            <div class="r-row"><span class="r-label">Artist share (${100-S.merchVenuePct}%)</span><span class="r-value">${money(c.merchArtistRev)}</span></div>
+            <div class="r-row" style="font-weight:600"><span class="r-label">JFA merch revenue (${S.merchVenuePct}%)</span><span class="r-value c-green">${money(c.merchVenueRev)}</span></div>
+          </div>
           `:''}
 
           <div class="section-divider" style="margin-top:16px"></div>
@@ -390,7 +402,9 @@ function render(){
         <div class="card">
           <div class="card-title">Venue P&amp;L</div>
           <div class="result-block">
-            <div class="r-row"><span class="r-label">Projected gross</span><span class="r-value">${money(c.projectedGross)}</span></div>
+            <div class="r-row"><span class="r-label">Ticket revenue</span><span class="r-value">${money(c.projectedGross)}</span></div>
+            ${c.merchVenueRev>0?`<div class="r-row"><span class="r-label">Merch commission (${S.merchVenuePct}%)</span><span class="r-value c-green">+${money(c.merchVenueRev)}</span></div>`:''}
+            ${c.merchVenueRev>0?`<div class="r-row" style="font-weight:600"><span class="r-label">Total venue revenue</span><span class="r-value">${money(c.totalVenueRevenue)}</span></div>`:''}
             <div class="r-row"><span class="r-label">Artist payment</span><span class="r-value c-red">-${money(c.artistPay)}</span></div>
             <div class="r-row"><span class="r-label">Venue expenses</span><span class="r-value c-red">-${money(c.totalExpenses)}</span></div>
             <div class="r-row total"><span class="r-label">Venue net</span><span class="r-value ${netClass}">${money(c.venueNet)}</span></div>
@@ -547,14 +561,15 @@ window.generatePrint=function(){
     ${S.hotelProvided?'<p style="margin-top:8px;font-size:13px;color:#5b6478">Hotel provided</p>':''}
     ${S.parking?'<p style="margin-top:4px;font-size:13px;color:#5b6478">Parking available onsite</p>':''}
 
-    ${S.merchEnabled?`<h3>Merch</h3><table><tr><td>Venue sells artist merch</td><td style="font-family:Inter,sans-serif">${S.merchVenuePct}% commission to JFA</td></tr></table>`:''}
+    ${S.merchEnabled?`<h3>Merch</h3><table><tr><td>Venue sells artist merch</td><td style="font-family:Inter,sans-serif">${S.merchVenuePct}% commission to JFA</td></tr>${c.merchGross>0?`<tr><td>Est. merch sales (${c.nights.length} night${c.nights.length>1?'s':''})</td><td>${money(c.merchGross)}</td></tr><tr><td>Artist merch revenue</td><td>${money(c.merchArtistRev)}</td></tr><tr><td style="font-weight:700">JFA merch revenue</td><td style="font-weight:700;color:#10b981">${money(c.merchVenueRev)}</td></tr>`:''}</table>`:''}
 
     ${S.exclusivityEnabled?`<h3>Exclusivity</h3><table><tr><td>Radius clause</td><td style="font-family:Inter,sans-serif">${S.exclusivityDays} days / ${S.exclusivityMiles} miles${S.exclusivityExclude?`, excl. ${escH(S.exclusivityExclude)}`:''}</td></tr></table>`:''}
 
     <h3>Financial Projection (${S.projectedAttendance}% Attendance)</h3>
     <table>
       <tr><td>Projected Tickets</td><td>${c.projectedTickets} of ${c.totalSeats}</td></tr>
-      <tr><td>Projected Gross</td><td>${money(c.projectedGross)}</td></tr>
+      <tr><td>Ticket Revenue</td><td>${money(c.projectedGross)}</td></tr>
+      ${c.merchVenueRev>0?`<tr><td>Merch Commission (${S.merchVenuePct}%)</td><td>+${money(c.merchVenueRev)}</td></tr><tr><td style="font-weight:700">Total Venue Revenue</td><td style="font-weight:700">${money(c.totalVenueRevenue)}</td></tr>`:''}
       <tr><td>Artist Payment</td><td>${money(c.artistPay)}</td></tr>
       ${allExp.map(e=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(e.name)}</td><td style="color:#8b93a7">${money(e.amount)}</td></tr>`).join('')}
       <tr><td>Venue Expenses</td><td>${money(c.totalExpenses)}</td></tr>
