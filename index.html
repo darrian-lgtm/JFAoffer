@@ -194,9 +194,18 @@ const S = {
   exclusivityExclude: "Dizzy's Club",
   // Hospitality / Backline
   backline: { steinway: true, bass: true, drums: true, sound: true },
-  dinner: true, greenRoom: true, hotelProvided: false,
-  soundcheck: true,
-  parking: true,
+  dinner: true, greenRoom: true,
+  soundcheck: true, parking: true,
+  // Hotel
+  hotelProvided: false,
+  hotelNights: 2, hotelRooms: 1,
+  hotelRoomType: 'Standard',
+  hotelCostPerNight: 175,
+  // Driver / Transportation
+  driverProvided: false,
+  driverType: 'Sedan',
+  driverCost: 250,
+  driverNotes: '',
   // Notes
   notes: '',
 };
@@ -216,7 +225,10 @@ function calc() {
   const projectedTickets = Math.round(totalSeats*S.projectedAttendance/100);
   const grossPotential = totalSeats*price;
   const projectedGross = projectedTickets*price;
-  const totalExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
+  const baseExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
+  const hotelCost = S.hotelProvided ? (+S.hotelNights||0) * (+S.hotelRooms||0) * (+S.hotelCostPerNight||0) : 0;
+  const driverCost = S.driverProvided ? (+S.driverCost||0) : 0;
+  const totalExpenses = baseExpenses + hotelCost + driverCost;
   const merchPerNight = S.merchEnabled ? S.merchItems.reduce((s,m)=>s+((+m.price||0)*(+m.qtyPerNight||0)),0) : 0;
   const merchGross = merchPerNight * nights.length;
   const merchVenueRev = merchGross * (S.merchVenuePct/100);
@@ -250,7 +262,7 @@ function calc() {
   const breakevenPct=totalSeats>0?(breakeven/totalSeats*100):0;
   const perTicketCost=projectedTickets>0?venueCost/projectedTickets:0;
   const margin=totalVenueRevenue>0?(venueNet/totalVenueRevenue*100):0;
-  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue};
+  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,baseExpenses,hotelCost,driverCost,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue};
 }
 
 function render(){
@@ -432,7 +444,9 @@ function render(){
             ${c.merchVenueRev>0?`<div class="r-row"><span class="r-label">Merch commission (${S.merchVenuePct}%)</span><span class="r-value c-green">+${money(c.merchVenueRev)}</span></div>`:''}
             ${c.merchVenueRev>0?`<div class="r-row" style="font-weight:600"><span class="r-label">Total venue revenue</span><span class="r-value">${money(c.totalVenueRevenue)}</span></div>`:''}
             <div class="r-row"><span class="r-label">Artist payment</span><span class="r-value c-red">-${money(c.artistPay)}</span></div>
-            <div class="r-row"><span class="r-label">Venue expenses</span><span class="r-value c-red">-${money(c.totalExpenses)}</span></div>
+            <div class="r-row"><span class="r-label">Venue expenses</span><span class="r-value c-red">-${money(c.baseExpenses)}</span></div>
+            ${c.hotelCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Hotel (${S.hotelRooms} rm &times; ${S.hotelNights} nts)</span><span class="r-value c-red">-${money(c.hotelCost)}</span></div>`:''}
+            ${c.driverCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Transportation (${S.driverType})</span><span class="r-value c-red">-${money(c.driverCost)}</span></div>`:''}
             <div class="r-row total"><span class="r-label">Venue net</span><span class="r-value ${netClass}">${money(c.venueNet)}</span></div>
           </div>
           <div class="stat-row">
@@ -457,12 +471,99 @@ function render(){
           <div class="check-group" style="margin-top:0">
             <div class="check-item ${S.dinner?'active':''}" onclick="S.dinner=!S.dinner;render()" style="padding:8px 10px"><input type="checkbox" ${S.dinner?'checked':''} onclick="event.stopPropagation();S.dinner=this.checked;render()"><span style="font-size:12px">Dinner</span></div>
             <div class="check-item ${S.greenRoom?'active':''}" onclick="S.greenRoom=!S.greenRoom;render()" style="padding:8px 10px"><input type="checkbox" ${S.greenRoom?'checked':''} onclick="event.stopPropagation();S.greenRoom=this.checked;render()"><span style="font-size:12px">Green Room</span></div>
-            <div class="check-item ${S.hotelProvided?'active':''}" onclick="S.hotelProvided=!S.hotelProvided;render()" style="padding:8px 10px"><input type="checkbox" ${S.hotelProvided?'checked':''} onclick="event.stopPropagation();S.hotelProvided=this.checked;render()"><span style="font-size:12px">Hotel</span></div>
           </div>
           <div class="check-group" style="margin-top:6px">
             <div class="check-item ${S.soundcheck?'active':''}" onclick="S.soundcheck=!S.soundcheck;render()" style="padding:8px 10px"><input type="checkbox" ${S.soundcheck?'checked':''} onclick="event.stopPropagation();S.soundcheck=this.checked;render()"><span style="font-size:12px">Soundcheck</span></div>
             <div class="check-item ${S.parking?'active':''}" onclick="S.parking=!S.parking;render()" style="padding:8px 10px"><input type="checkbox" ${S.parking?'checked':''} onclick="event.stopPropagation();S.parking=this.checked;render()"><span style="font-size:12px">Parking</span></div>
           </div>
+
+          <!-- Hotel -->
+          <div class="section-divider" style="margin-top:14px"></div>
+          <div class="card-title" style="margin-top:0">Hotel</div>
+          <div class="check-item ${S.hotelProvided?'active':''}" onclick="S.hotelProvided=!S.hotelProvided;render()" style="margin-bottom:8px">
+            <input type="checkbox" ${S.hotelProvided?'checked':''} onclick="event.stopPropagation();S.hotelProvided=this.checked;render()">
+            <span>Provide hotel</span>
+          </div>
+          ${S.hotelProvided?`
+          <div class="row">
+            <div>
+              <label>Nights</label>
+              <select onchange="S.hotelNights=+this.value;render()">
+                <option value="1" ${S.hotelNights===1?'selected':''}>1 night</option>
+                <option value="2" ${S.hotelNights===2?'selected':''}>2 nights</option>
+                <option value="3" ${S.hotelNights===3?'selected':''}>3 nights</option>
+                <option value="4" ${S.hotelNights===4?'selected':''}>4 nights</option>
+              </select>
+            </div>
+            <div>
+              <label>Rooms</label>
+              <select onchange="S.hotelRooms=+this.value;render()">
+                <option value="1" ${S.hotelRooms===1?'selected':''}>1 room</option>
+                <option value="2" ${S.hotelRooms===2?'selected':''}>2 rooms</option>
+                <option value="3" ${S.hotelRooms===3?'selected':''}>3 rooms</option>
+                <option value="4" ${S.hotelRooms===4?'selected':''}>4 rooms</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Room Type</label>
+              <select onchange="S.hotelRoomType=this.value;render()">
+                <option ${S.hotelRoomType==='Standard'?'selected':''}>Standard</option>
+                <option ${S.hotelRoomType==='Queen'?'selected':''}>Queen</option>
+                <option ${S.hotelRoomType==='King'?'selected':''}>King</option>
+                <option ${S.hotelRoomType==='Suite'?'selected':''}>Suite</option>
+                <option ${S.hotelRoomType==='Double Queen'?'selected':''}>Double Queen</option>
+              </select>
+            </div>
+            <div>
+              <label>Cost / Night</label>
+              <input type="number" value="${S.hotelCostPerNight}" onchange="S.hotelCostPerNight=+this.value;render()">
+            </div>
+          </div>
+          <div class="result-block" style="margin-top:10px">
+            <div class="r-row"><span class="r-label">${S.hotelRooms} ${S.hotelRoomType} &times; ${S.hotelNights} night${S.hotelNights>1?'s':''} &times; ${money(S.hotelCostPerNight)}</span><span class="r-value c-red">${money(c.hotelCost)}</span></div>
+          </div>
+          `:''}
+
+          <!-- Driver -->
+          <div class="section-divider" style="margin-top:14px"></div>
+          <div class="card-title" style="margin-top:0">Transportation</div>
+          <div class="check-item ${S.driverProvided?'active':''}" onclick="S.driverProvided=!S.driverProvided;render()" style="margin-bottom:8px">
+            <input type="checkbox" ${S.driverProvided?'checked':''} onclick="event.stopPropagation();S.driverProvided=this.checked;render()">
+            <span>Provide driver / car service</span>
+          </div>
+          ${S.driverProvided?`
+          <div class="row">
+            <div>
+              <label>Vehicle Type</label>
+              <select onchange="S.driverType=this.value;render()">
+                <option ${S.driverType==='Sedan'?'selected':''}>Sedan</option>
+                <option ${S.driverType==='SUV'?'selected':''}>SUV</option>
+                <option ${S.driverType==='Van'?'selected':''}>Van</option>
+                <option ${S.driverType==='Sprinter'?'selected':''}>Sprinter</option>
+                <option ${S.driverType==='Town Car'?'selected':''}>Town Car</option>
+              </select>
+            </div>
+            <div>
+              <label>Total Cost</label>
+              <input type="number" value="${S.driverCost}" onchange="S.driverCost=+this.value;render()">
+            </div>
+          </div>
+          <label>Notes</label>
+          <input type="text" value="${esc(S.driverNotes)}" onchange="S.driverNotes=this.value" placeholder="e.g. NYC roundtrip, pickup at 4pm">
+          <div class="result-block" style="margin-top:10px">
+            <div class="r-row"><span class="r-label">${S.driverType} service</span><span class="r-value c-red">${money(c.driverCost)}</span></div>
+          </div>
+          `:''}
+
+          <!-- Travel cost summary -->
+          ${S.hotelProvided||S.driverProvided?`
+          <div class="expense-total" style="margin-top:12px">
+            <span>Travel costs in P&amp;L</span>
+            <span class="et-val" style="color:var(--red)">${money(c.hotelCost+c.driverCost)}</span>
+          </div>
+          `:''}
         </div>
 
         <div class="card">
@@ -501,8 +602,9 @@ window.generateEmail=function(){
   detailItems.push(`Doors: ${fmt12(S.doorsTime)}`);
   if(S.soundcheck) detailItems.push('Soundcheck: coordinated in advance');
   if(S.parking) detailItems.push('Parking available onsite');
-  if(S.hotelProvided) detailItems.push('Hotel provided');
+  if(S.hotelProvided) detailItems.push(`Hotel: ${S.hotelRooms} ${S.hotelRoomType} room${S.hotelRooms>1?'s':''}, ${S.hotelNights} night${S.hotelNights>1?'s':''}`);
   else detailItems.push('No hotel provided unless otherwise agreed');
+  if(S.driverProvided) detailItems.push(`Transportation: ${S.driverType} service provided${S.driverNotes?' ('+S.driverNotes+')':''}`);
 
   let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${fmt12(S.set1Time)} & ${fmt12(S.set2Time)})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n$${c.price} per ticket\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
 
@@ -584,8 +686,9 @@ window.generatePrint=function(){
 
     <h3>Backline &amp; Hospitality</h3>
     <ul class="os-list">${backlineList.map(b=>`<li>${b}</li>`).join('')}</ul>
-    ${S.hotelProvided?'<p style="margin-top:8px;font-size:13px;color:#5b6478">Hotel provided</p>':''}
+    ${S.hotelProvided?`<table style="margin-top:8px"><tr><td>Hotel</td><td style="font-family:Inter,sans-serif">${S.hotelRooms} ${escH(S.hotelRoomType)} room${S.hotelRooms>1?'s':''}, ${S.hotelNights} night${S.hotelNights>1?'s':''} (${money(c.hotelCost)})</td></tr></table>`:''}
     ${S.parking?'<p style="margin-top:4px;font-size:13px;color:#5b6478">Parking available onsite</p>':''}
+    ${S.driverProvided?`<table style="margin-top:8px"><tr><td>Transportation</td><td style="font-family:Inter,sans-serif">${escH(S.driverType)} service (${money(c.driverCost)})${S.driverNotes?' — '+escH(S.driverNotes):''}</td></tr></table>`:''}
 
     ${S.merchEnabled?`<h3>Merch</h3><table><tr><td>Commission</td><td style="font-family:Inter,sans-serif">${S.merchVenuePct}% to JFA / ${100-S.merchVenuePct}% to artist</td></tr></table>${c.merchItemDetails.length>0?`<table style="margin-top:8px">${c.merchItemDetails.filter(m=>m.perNight>0).map(m=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(m.name)} (${m.qty} &times; ${money(m.price)})</td><td style="color:#8b93a7">${money(m.perNight)}/night</td></tr>`).join('')}<tr><td>Est. total merch (${c.nights.length} night${c.nights.length>1?'s':''})</td><td>${money(c.merchGross)}</td></tr><tr><td>Artist merch revenue</td><td>${money(c.merchArtistRev)}</td></tr><tr><td style="font-weight:700">JFA merch revenue</td><td style="font-weight:700;color:#10b981">${money(c.merchVenueRev)}</td></tr></table>`:''}`:''}
 
@@ -599,7 +702,9 @@ window.generatePrint=function(){
       ${c.merchVenueRev>0?`<tr><td>Merch Commission (${S.merchVenuePct}%)</td><td>+${money(c.merchVenueRev)}</td></tr><tr><td style="font-weight:700">Total Venue Revenue</td><td style="font-weight:700">${money(c.totalVenueRevenue)}</td></tr>`:''}
       <tr><td>Artist Payment</td><td>${money(c.artistPay)}</td></tr>
       ${allExp.map(e=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(e.name)}</td><td style="color:#8b93a7">${money(e.amount)}</td></tr>`).join('')}
-      <tr><td>Venue Expenses</td><td>${money(c.totalExpenses)}</td></tr>
+      <tr><td>Venue Expenses</td><td>${money(c.baseExpenses)}</td></tr>
+      ${c.hotelCost>0?`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">Hotel (${S.hotelRooms} ${escH(S.hotelRoomType)} &times; ${S.hotelNights} nts)</td><td style="color:#8b93a7">${money(c.hotelCost)}</td></tr>`:''}
+      ${c.driverCost>0?`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">Transportation (${escH(S.driverType)})</td><td style="color:#8b93a7">${money(c.driverCost)}</td></tr>`:''}
       <tr class="os-total"><td>Venue Net</td><td style="color:${c.venueNet>=0?'#10b981':'#ef4444'}">${money(c.venueNet)}</td></tr>
     </table>
     <table style="margin-top:8px"><tr><td>Breakeven</td><td>${c.breakeven} tickets (${pct(c.breakevenPct)})</td></tr></table>
