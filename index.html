@@ -43,6 +43,18 @@ body{background:var(--bg);color:var(--text-primary);font-family:'Inter',-apple-s
 .card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:16px}
 .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:16px}
 
+/* Collapsible sections (left panel) */
+.card.collapsible{padding:0;overflow:hidden}
+.card.collapsible .sec-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;user-select:none;transition:background .15s}
+.card.collapsible .sec-header:hover{background:var(--surface-alt)}
+.card.collapsible .sec-header .card-title{margin-bottom:0;pointer-events:none}
+.card.collapsible .sec-header .sec-chevron{width:20px;height:20px;color:var(--text-muted);transition:transform .25s ease;flex-shrink:0}
+.card.collapsible .sec-header .sec-chevron.open{transform:rotate(180deg)}
+.card.collapsible .sec-header .sec-summary{font-size:12px;color:var(--text-muted);font-weight:500;margin-left:auto;margin-right:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.card.collapsible .sec-body{padding:0 20px 20px;display:none}
+.card.collapsible .sec-body.open{display:block}
+.card.collapsible.sec-open .sec-header{border-bottom:1px solid var(--border-light)}
+
 label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px;margin-top:14px}
 label:first-child{margin-top:0}
 input[type="text"],input[type="number"],input[type="time"],select,textarea{width:100%;padding:9px 12px;background:var(--surface-alt);color:var(--text-primary);border:1px solid var(--border);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;border-radius:var(--radius-xs);transition:border-color .15s,box-shadow .15s}
@@ -254,6 +266,8 @@ const S = {
   driverNotes: '',
   // Notes
   notes: '',
+  // Section open/close state (left panel)
+  _sections: { artist: true, schedule: true, pricing: false, expenses: false, sponsors: false, merch: false, logistics: false, notes: false, comps: false },
   // Post-Show Actuals
   showActuals: false,
   actualTicketsSold: 0,
@@ -417,7 +431,7 @@ window.newOffer = function() {
     dinner:true,greenRoom:true,soundcheck:true,parking:true,
     hotelProvided:false,hotelNights:2,hotelRooms:[{type:'King',costPerNight:200}],
     driverProvided:false,driverType:'Sedan',driverCost:250,driverNotes:'',
-    notes:'',showActuals:false,actualTicketsSold:0,actualTierSales:[],actualMerchSold:[]
+    notes:'',_sections:{artist:true,schedule:true,pricing:false,expenses:false,sponsors:false,merch:false,logistics:false,notes:false,comps:false},showActuals:false,actualTicketsSold:0,actualTierSales:[],actualMerchSold:[]
   };
   loadStateFromSnapshot(defaults);
   _currentOfferId = null;
@@ -782,18 +796,29 @@ function render(){
     <div class="grid">
       <!-- ═══ LEFT ═══ -->
       <div>
-        <div class="card">
-          <div class="card-title">Artist Details</div>
-          <label>Artist / Band</label>
+        <div class="card collapsible ${secOpen('artist')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('artist')">
+            <div class="card-title">Artist Details</div>
+            ${S.artistName?`<span class="sec-summary">${escH(S.artistName)}</span>`:''}
+            ${chevron('artist')}
+          </div>
+          <div class="sec-body ${secOpen('artist')?'open':''}">
+          <label style="margin-top:0">Artist / Band</label>
           <input type="text" value="${esc(S.artistName)}" data-f="artistName" onchange="uf(this)" placeholder="e.g. Champian Fulton Trio">
           <label>Agent / Contact</label>
           <input type="text" value="${esc(S.agentName)}" data-f="agentName" onchange="uf(this)" placeholder="Optional">
           <label>Date(s)</label>
           <input type="text" value="${esc(S.showDate)}" data-f="showDate" onchange="uf(this)" placeholder="e.g. Mar 21-22, 2026">
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">Show Schedule</div>
+        <div class="card collapsible ${secOpen('schedule')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('schedule')">
+            <div class="card-title">Show Schedule</div>
+            <span class="sec-summary">${[S.friday?'Fri':'',S.saturday?'Sat':'',S.sunday?'Sun':''].filter(Boolean).join(', ')}</span>
+            ${chevron('schedule')}
+          </div>
+          <div class="sec-body ${secOpen('schedule')?'open':''}"  style="padding-top:16px">
           <div class="check-group">
             <div class="check-item ${S.friday?'active':''}" onclick="S.friday=!S.friday;render()"><input type="checkbox" ${S.friday?'checked':''} onclick="event.stopPropagation();S.friday=this.checked;render()"><span>Fri</span></div>
             <div class="check-item ${S.saturday?'active':''}" onclick="S.saturday=!S.saturday;render()"><input type="checkbox" ${S.saturday?'checked':''} onclick="event.stopPropagation();S.saturday=this.checked;render()"><span>Sat</span></div>
@@ -843,8 +868,13 @@ function render(){
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">Ticket Pricing</div>
+        <div class="card collapsible ${secOpen('pricing')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('pricing')">
+            <div class="card-title">Ticket Pricing</div>
+            <span class="sec-summary">${S.specialEvent?'Tiered':'$'+S.ticketPrice} · ${S.projectedAttendance}%</span>
+            ${chevron('pricing')}
+          </div>
+          <div class="sec-body ${secOpen('pricing')?'open':''}">
           ${!S.specialEvent?`
           <label>Price per ticket</label>
           <input type="number" value="${S.ticketPrice}" onchange="S.ticketPrice=+this.value;render()" style="font-size:18px;padding:12px">
@@ -876,9 +906,16 @@ function render(){
           <label>Projected attendance <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Expected % of seats sold. 85% is typical for JFA weekends.</span></span></label>
           <input type="range" min="30" max="100" value="${S.projectedAttendance}" oninput="S.projectedAttendance=+this.value;render()">
           <div class="attendance-display"><div class="big">${S.projectedAttendance}%</div><div class="sub">${c.projectedTickets} of ${c.totalSeats} seats</div></div>
+          </div>
+        </div>
 
-        <div class="card">
-          <div class="card-title">Comp Tickets</div>
+        <div class="card collapsible ${secOpen('comps')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('comps')">
+            <div class="card-title">Comp Tickets</div>
+            <span class="sec-summary">${(()=>{const tc=S.compTickets.reduce((s,c)=>s+(+c.qty||0),0);return tc>0?tc+' comps':'None';})()}</span>
+            ${chevron('comps')}
+          </div>
+          <div class="sec-body ${secOpen('comps')?'open':''}">
           <div style="display:flex;gap:6px;margin-bottom:6px">
             <div style="flex:2;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Category</div>
             <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Qty</div>
@@ -893,18 +930,29 @@ function render(){
           `).join('')}
           <button class="expense-add" onclick="S.compTickets.push({name:'',qty:0});render()">+ Add category</button>
           ${(()=>{const tc=S.compTickets.reduce((s,c)=>s+(+c.qty||0),0);return tc>0?`<div style="margin-top:12px;padding:10px 14px;background:var(--yellow-bg);border-radius:var(--radius-xs);font-size:13px;color:var(--text-secondary)"><strong>${tc} comp ticket${tc>1?'s':''}</strong> (${money(S.specialEvent && S.priceTiers.length > 0 ? tc * (S.priceTiers.reduce((s,t)=>s+((+t.seats||0)*(+t.price||0)),0) / S.seatsPerSet) : tc*S.ticketPrice)} revenue impact)</div>`:'';})()}
-        </div>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">Venue Expenses</div>
+        <div class="card collapsible ${secOpen('expenses')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('expenses')">
+            <div class="card-title">Venue Expenses</div>
+            <span class="sec-summary">${money(c.totalExpenses)}</span>
+            ${chevron('expenses')}
+          </div>
+          <div class="sec-body ${secOpen('expenses')?'open':''}">
           ${S.expenses.map((e,i)=>`<div class="expense-row"><span class="exp-name">${e.name}</span><input type="number" value="${e.amount}" onchange="S.expenses[${i}].amount=+this.value;render()"></div>`).join('')}
           ${S.customExpenses.map((e,i)=>`<div class="expense-row"><input type="text" value="${esc(e.name)}" onchange="S.customExpenses[${i}].name=this.value" placeholder="Name" style="max-width:110px"><input type="number" value="${e.amount}" onchange="S.customExpenses[${i}].amount=+this.value;render()"><button class="expense-remove" onclick="S.customExpenses.splice(${i},1);render()">&times;</button></div>`).join('')}
           <button class="expense-add" onclick="S.customExpenses.push({name:'',amount:0});render()">+ Add line item</button>
           <div class="expense-total"><span>Total</span><span class="et-val">${money(c.totalExpenses)}</span></div>
-        <
-        <div class="card">
-          <div class="card-title">Sponsors &amp; Grants</div>
+          </div>
+        </div>
+        <div class="card collapsible ${secOpen('sponsors')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('sponsors')">
+            <div class="card-title">Sponsors &amp; Grants</div>
+            <span class="sec-summary">${(()=>{const sr=S.sponsors.reduce((s,sp)=>s+(+sp.amount||0),0);return sr>0?money(sr):'None';})()}</span>
+            ${chevron('sponsors')}
+          </div>
+          <div class="sec-body ${secOpen('sponsors')?'open':''}">
           <div style="display:flex;gap:6px;margin-bottom:6px">
             <div style="flex:2;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Name</div>
             <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Amount</div>
@@ -919,13 +967,17 @@ function render(){
           `).join('')}
           <button class="expense-add" onclick="S.sponsors.push({name:'',amount:0});render()">+ Add sponsor</button>
           ${(()=>{const sr=S.sponsors.reduce((s,sp)=>s+(+sp.amount||0),0);return sr>0?`<div style="margin-top:12px;padding:10px 14px;background:var(--green-bg);border-radius:var(--radius-xs);font-size:13px;color:var(--text-secondary)"><strong>${money(sr)}</strong> in sponsor/grant revenue</div>`:'';})()}
+          </div>
         </div>
 
-/div>
-
         <!-- Merch & Terms -->
-        <div class="card">
-          <div class="card-title">Merch &amp; Terms</div>
+        <div class="card collapsible ${secOpen('merch')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('merch')">
+            <div class="card-title">Merch &amp; Terms</div>
+            <span class="sec-summary">${S.merchEnabled?S.merchVenuePct+'% commission':'No merch'}</span>
+            ${chevron('merch')}
+          </div>
+          <div class="sec-body ${secOpen('merch')?'open':''}">
           <div class="check-item ${S.merchEnabled?'active':''}" onclick="S.merchEnabled=!S.merchEnabled;render()" style="margin-bottom:8px">
             <input type="checkbox" ${S.merchEnabled?'checked':''} onclick="event.stopPropagation();S.merchEnabled=this.checked;render()">
             <span>Merch sales at venue</span>
@@ -980,6 +1032,7 @@ function render(){
           <label>Exclude venue(s)</label>
           <input type="text" value="${esc(S.exclusivityExclude)}" onchange="S.exclusivityExclude=this.value;render()" placeholder="e.g. Dizzy's Club">
           `:''}
+          </div>
         </div>
       </div>
 
@@ -1129,11 +1182,16 @@ function render(){
           `}
         </div>
 
-        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100),nightRev=S.specialEvent&&c.tierDetails.length>0?Math.round(c.tierDetails.reduce((s,t)=>s+t.perSet,0)*n.sets*S.projectedAttendance/100):nt*c.price;return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nightRev)}</span></div>`;}).join('')}</div></div>`:''}
+        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100),nightRev=S.specialEvent&&c.tierDetails.length>0?Math.round(c.tierDetails.reduce((s,t)=>s+t.perSet,0)*n.sets*S.projectedAttendance/100):nt*c.price;return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nightRev)}</span></div>`;}).join('')}</div></div></div>`:''}
 
         <!-- Backline & Hospitality -->
-        <div class="card">
-          <div class="card-title">Backline &amp; Hospitality</div>
+        <div class="card collapsible ${secOpen('logistics')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('logistics')">
+            <div class="card-title">Backline &amp; Hospitality</div>
+            <span class="sec-summary">${[S.hotelProvided?'Hotel':'',S.driverProvided?'Driver':''].filter(Boolean).join(', ')||'Backline only'}</span>
+            ${chevron('logistics')}
+          </div>
+          <div class="sec-body ${secOpen('logistics')?'open':''}">
           <div class="bl-grid">
             <div class="bl-item" onclick="S.backline.steinway=!S.backline.steinway;render()" style="cursor:pointer;opacity:${S.backline.steinway?1:0.4}"><div class="bl-dot" style="background:${S.backline.steinway?'var(--green)':'var(--border)'}"></div>Steinway B Piano</div>
             <div class="bl-item" onclick="S.backline.bass=!S.backline.bass;render()" style="cursor:pointer;opacity:${S.backline.bass?1:0.4}"><div class="bl-dot" style="background:${S.backline.bass?'var(--green)':'var(--border)'}"></div>Bass &amp; Amp</div>
@@ -1231,11 +1289,18 @@ function render(){
             <span class="et-val" style="color:var(--red)">${money(c.hotelCost+c.driverCost)}</span>
           </div>
           `:''}
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">Offer Notes</div>
+        <div class="card collapsible ${secOpen('notes')?'sec-open':''}">
+          <div class="sec-header" onclick="toggleSec('notes')">
+            <div class="card-title">Offer Notes</div>
+            <span class="sec-summary">${S.notes?S.notes.split('\n')[0].substring(0,40)+'...':'Add notes'}</span>
+            ${chevron('notes')}
+          </div>
+          <div class="sec-body ${secOpen('notes')?'open':''}">
           <textarea onchange="S.notes=this.value" placeholder="Additional terms, rider requests, travel arrangements...">${esc(S.notes)}</textarea>
+          </div>
         </div>
 
         <button class="btn-primary" onclick="generateEmail()">Generate Email Offer</button>
@@ -1250,6 +1315,9 @@ function render(){
 function esc(s){return(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 window.uf=function(el){S[el.dataset.f]=el.value;render()};
+window.toggleSec=function(key){if(!S._sections)S._sections={};S._sections[key]=!S._sections[key];render()};
+const secOpen=key=>(S._sections&&S._sections[key]);
+const chevron=key=>`<svg class="sec-chevron ${secOpen(key)?'open':''}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>`;
 
 // ── Email Generator ──
 window.generateEmail=function(){
