@@ -170,7 +170,11 @@ const S = {
   set1Time: '19:00', set2Time: '21:30', setLength: 70,
   doorsTime: '17:50',
   // Pricing
-  ticketPrice: 45, specialEvent: false, specialPrice: 125,
+  ticketPrice: 45, specialEvent: false,
+  priceTiers: [
+    { name: 'Premium', seats: 30, price: 250 },
+    { name: 'Standard', seats: 60, price: 150 },
+  ],
   projectedAttendance: 85,
   // Deal params
   guarantee: 2000, artistPct: 70,
@@ -198,9 +202,10 @@ const S = {
   soundcheck: true, parking: true,
   // Hotel
   hotelProvided: false,
-  hotelNights: 2, hotelRooms: 1,
-  hotelRoomType: 'Standard',
-  hotelCostPerNight: 175,
+  hotelNights: 2,
+  hotelRooms: [
+    { type: 'King', costPerNight: 200 },
+  ],
   // Driver / Transportation
   driverProvided: false,
   driverType: 'Sedan',
@@ -208,6 +213,11 @@ const S = {
   driverNotes: '',
   // Notes
   notes: '',
+  // Post-Show Actuals
+  showActuals: false,
+  actualTicketsSold: 0,
+  actualTierSales: [],  // [{sold: 0}] per tier, auto-synced
+  actualMerchSold: [],  // [{qtySold: 0}] per merch item, auto-synced
 };
 
 const $ = id => document.getElementById(id);
@@ -220,13 +230,24 @@ function calc() {
   if (S.friday) nights.push({day:'Friday',abbr:'Fri',sets:S.friSets});
   if (S.saturday) nights.push({day:'Saturday',abbr:'Sat',sets:S.satSets});
   if (S.sunday) nights.push({day:'Sunday',abbr:'Sun',sets:S.sunSets});
-  const price = S.specialEvent ? S.specialPrice : S.ticketPrice;
-  const totalSeats = nights.reduce((s,n)=>s+n.sets*S.seatsPerSet,0);
+  const totalSeatings = nights.reduce((s,n)=>s+n.sets,0);
+  const totalSeats = totalSeatings * S.seatsPerSet;
   const projectedTickets = Math.round(totalSeats*S.projectedAttendance/100);
-  const grossPotential = totalSeats*price;
-  const projectedGross = projectedTickets*price;
+  let grossPotential, projectedGross, price, tierDetails=[];
+  if (S.specialEvent && S.priceTiers.length > 0) {
+    const perSetRevenue = S.priceTiers.reduce((s,t)=>s+((+t.seats||0)*(+t.price||0)),0);
+    grossPotential = perSetRevenue * totalSeatings;
+    projectedGross = Math.round(grossPotential * S.projectedAttendance / 100);
+    const tierSeats = S.priceTiers.reduce((s,t)=>s+(+t.seats||0),0);
+    price = tierSeats > 0 ? Math.round(grossPotential / totalSeats) : 0;
+    tierDetails = S.priceTiers.map(t=>({name:t.name,seats:+t.seats||0,price:+t.price||0,perSet:(+t.seats||0)*(+t.price||0)}));
+  } else {
+    price = S.ticketPrice;
+    grossPotential = totalSeats * price;
+    projectedGross = projectedTickets * price;
+  }
   const baseExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
-  const hotelCost = S.hotelProvided ? (+S.hotelNights||0) * (+S.hotelRooms||0) * (+S.hotelCostPerNight||0) : 0;
+  const hotelCost = S.hotelProvided ? S.hotelRooms.reduce((s,r)=>s+((+r.costPerNight||0)*(+S.hotelNights||0)),0) : 0;
   const driverCost = S.driverProvided ? (+S.driverCost||0) : 0;
   const totalExpenses = baseExpenses + hotelCost + driverCost;
   const merchPerNight = S.merchEnabled ? S.merchItems.reduce((s,m)=>s+((+m.price||0)*(+m.qtyPerNight||0)),0) : 0;
@@ -262,7 +283,43 @@ function calc() {
   const breakevenPct=totalSeats>0?(breakeven/totalSeats*100):0;
   const perTicketCost=projectedTickets>0?venueCost/projectedTickets:0;
   const margin=totalVenueRevenue>0?(venueNet/totalVenueRevenue*100):0;
-  return {nights,price,totalSeats,projectedTickets,grossPotential,projectedGross,baseExpenses,hotelCost,driverCost,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue};
+
+  // ── Post-Show Actuals ──
+  // Sync actuals arrays to match current tiers/merch items
+  while(S.actualTierSales.length<S.priceTiers.length) S.actualTierSales.push({sold:0});
+  while(S.actualTierSales.length>S.priceTiers.length) S.actualTierSales.pop();
+  while(S.actualMerchSold.length<S.merchItems.length) S.actualMerchSold.push({qtySold:0});
+  while(S.actualMerchSold.length>S.merchItems.length) S.actualMerchSold.pop();
+
+  let actGross=0, actTickets=0, actArtistPay=0, actMerchGross=0, actMerchVenueRev=0, actMerchArtistRev=0;
+  if(S.showActuals){
+    if(S.specialEvent && S.priceTiers.length>0){
+      actGross = S.actualTierSales.reduce((s,t,i)=>s+((+t.sold||0)*(+S.priceTiers[i].price||0)),0);
+      actTickets = S.actualTierSales.reduce((s,t)=>s+(+t.sold||0),0);
+    } else {
+      actTickets = +S.actualTicketsSold||0;
+      actGross = actTickets * price;
+    }
+    // Recalculate artist pay based on actuals
+    if(S.dealType==='flat') actArtistPay=+S.guarantee||0;
+    else if(S.dealType==='vs'){ actArtistPay=Math.max(+S.guarantee||0, actGross*(S.artistPct/100)); }
+    else if(S.dealType==='door') actArtistPay=actGross*(S.doorPct/100);
+    else if(S.dealType==='plus'){
+      const g=+S.plusGuarantee||0,be=g+totalExpenses,ov=Math.max(0,actGross-be),bonus=ov*(S.plusPct/100);
+      actArtistPay=g+bonus;
+    }
+    // Actual merch
+    actMerchGross = S.actualMerchSold.reduce((s,m,i)=>s+((+m.qtySold||0)*(+S.merchItems[i].price||0)),0);
+    actMerchVenueRev = S.merchEnabled ? actMerchGross*(S.merchVenuePct/100) : 0;
+    actMerchArtistRev = actMerchGross - actMerchVenueRev;
+  }
+  const actVenueCost = actArtistPay + totalExpenses;
+  const actTotalVenueRevenue = actGross + actMerchVenueRev;
+  const actVenueNet = actTotalVenueRevenue - actVenueCost;
+  const actMargin = actTotalVenueRevenue>0?(actVenueNet/actTotalVenueRevenue*100):0;
+  const actuals = {actGross,actTickets,actArtistPay,actMerchGross,actMerchVenueRev,actMerchArtistRev,actVenueCost,actTotalVenueRevenue,actVenueNet,actMargin};
+
+  return {nights,price,totalSeats,totalSeatings,projectedTickets,grossPotential,projectedGross,baseExpenses,hotelCost,driverCost,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue,tierDetails,actuals};
 }
 
 function render(){
@@ -326,12 +383,34 @@ function render(){
 
         <div class="card">
           <div class="card-title">Ticket Pricing</div>
+          ${!S.specialEvent?`
           <label>Price per ticket</label>
           <input type="number" value="${S.ticketPrice}" onchange="S.ticketPrice=+this.value;render()" style="font-size:18px;padding:12px">
-          <div class="check-group" style="margin-top:12px">
-            <div class="check-item ${S.specialEvent?'active':''}" onclick="S.specialEvent=!S.specialEvent;render()"><input type="checkbox" ${S.specialEvent?'checked':''} onclick="event.stopPropagation();S.specialEvent=this.checked;render()"><span>Special event pricing</span></div>
+          `:''}
+          <div class="check-group" style="margin-top:${S.specialEvent?'0':'12'}px">
+            <div class="check-item ${S.specialEvent?'active':''}" onclick="S.specialEvent=!S.specialEvent;render()"><input type="checkbox" ${S.specialEvent?'checked':''} onclick="event.stopPropagation();S.specialEvent=this.checked;render()"><span>Tiered / special event pricing</span></div>
           </div>
-          ${S.specialEvent?`<label>Special event price</label><input type="number" value="${S.specialPrice}" onchange="S.specialPrice=+this.value;render()">`:''}
+          ${S.specialEvent?`
+          <div style="margin-top:10px">
+            <div style="display:flex;gap:6px;margin-bottom:6px">
+              <div style="flex:1.5;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Tier Name</div>
+              <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Seats</div>
+              <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Price</div>
+              <div style="flex:0 0 28px"></div>
+            </div>
+            ${S.priceTiers.map((t,i)=>`
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+              <input type="text" value="${esc(t.name)}" onchange="S.priceTiers[${i}].name=this.value" placeholder="e.g. VIP" style="flex:1.5">
+              <input type="number" value="${t.seats}" onchange="S.priceTiers[${i}].seats=+this.value;render()" placeholder="Seats" style="flex:1">
+              <input type="number" value="${t.price}" onchange="S.priceTiers[${i}].price=+this.value;render()" placeholder="$" style="flex:1">
+              ${S.priceTiers.length>1?`<button class="expense-remove" onclick="S.priceTiers.splice(${i},1);render()" style="flex:0 0 28px">&times;</button>`:'<span style="flex:0 0 28px"></span>'}
+            </div>
+            `).join('')}
+            <button class="expense-add" onclick="S.priceTiers.push({name:'',seats:0,price:0});render()">+ Add tier</button>
+            ${(()=>{const tierSeats=S.priceTiers.reduce((s,t)=>s+(+t.seats||0),0);const diff=S.seatsPerSet-tierSeats;return diff!==0?`<div style="font-size:12px;margin-top:8px;padding:8px 12px;background:${diff>0?'var(--yellow-bg)':'var(--red-bg)'};border-radius:var(--radius-xs);color:${diff>0?'var(--yellow)':'var(--red)'}">Tier seats: ${tierSeats} &middot; Venue capacity: ${S.seatsPerSet}/set &middot; ${diff>0?diff+' seats unallocated':Math.abs(diff)+' seats over capacity'}</div>`:'<div style="font-size:12px;margin-top:8px;padding:8px 12px;background:var(--green-bg);border-radius:var(--radius-xs);color:var(--green)">All ${tierSeats} seats allocated per set</div>';})()}
+          </div>
+          `:''}
+
           <label>Projected attendance <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Expected % of seats sold. 85% is typical for JFA weekends.</span></span></label>
           <input type="range" min="30" max="100" value="${S.projectedAttendance}" oninput="S.projectedAttendance=+this.value;render()">
           <div class="attendance-display"><div class="big">${S.projectedAttendance}%</div><div class="sub">${c.projectedTickets} of ${c.totalSeats} seats</div></div>
@@ -425,8 +504,13 @@ function render(){
         <div class="card">
           <div class="card-title">Revenue Projection</div>
           <div class="result-block">
+            ${S.specialEvent&&c.tierDetails.length>0?`
+            ${c.tierDetails.map(t=>`<div class="r-row"><span class="r-label">${escH(t.name)||'Tier'}: ${t.seats} seats &times; ${money(t.price)}</span><span class="r-value">${money(t.perSet)}/set</span></div>`).join('')}
+            <div class="r-row"><span class="r-label">&times; ${c.totalSeatings} seatings</span><span class="r-value">${c.totalSeats} total seats</span></div>
+            `:`
             <div class="r-row"><span class="r-label">Ticket price</span><span class="r-value">${money(c.price)}</span></div>
             <div class="r-row"><span class="r-label">Total capacity (${c.nights.map(n=>n.abbr).join(' + ')})</span><span class="r-value">${c.totalSeats} seats</span></div>
+            `}
             <div class="r-row"><span class="r-label">Gross potential (sold out)</span><span class="r-value">${money(c.grossPotential)}</span></div>
             <div class="r-row total"><span class="r-label">Projected gross at ${S.projectedAttendance}%</span><span class="r-value c-accent">${money(c.projectedGross)}</span></div>
           </div>
@@ -438,25 +522,100 @@ function render(){
         </div>
 
         <div class="card">
-          <div class="card-title">Venue P&amp;L</div>
+          <div class="card-title">Financial Projection</div>
           <div class="result-block">
             <div class="r-row"><span class="r-label">Ticket revenue</span><span class="r-value">${money(c.projectedGross)}</span></div>
             ${c.merchVenueRev>0?`<div class="r-row"><span class="r-label">Merch commission (${S.merchVenuePct}%)</span><span class="r-value c-green">+${money(c.merchVenueRev)}</span></div>`:''}
             ${c.merchVenueRev>0?`<div class="r-row" style="font-weight:600"><span class="r-label">Total venue revenue</span><span class="r-value">${money(c.totalVenueRevenue)}</span></div>`:''}
             <div class="r-row"><span class="r-label">Artist payment</span><span class="r-value c-red">-${money(c.artistPay)}</span></div>
             <div class="r-row"><span class="r-label">Venue expenses</span><span class="r-value c-red">-${money(c.baseExpenses)}</span></div>
-            ${c.hotelCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Hotel (${S.hotelRooms} rm &times; ${S.hotelNights} nts)</span><span class="r-value c-red">-${money(c.hotelCost)}</span></div>`:''}
+            ${c.hotelCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Hotel (${S.hotelRooms.length} rm &times; ${S.hotelNights} nts)</span><span class="r-value c-red">-${money(c.hotelCost)}</span></div>`:''}
             ${c.driverCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Transportation (${S.driverType})</span><span class="r-value c-red">-${money(c.driverCost)}</span></div>`:''}
-            <div class="r-row total"><span class="r-label">Venue net</span><span class="r-value ${netClass}">${money(c.venueNet)}</span></div>
+            <div class="r-row total"><span class="r-label">Projected net</span><span class="r-value ${netClass}">${money(c.venueNet)}</span></div>
           </div>
           <div class="stat-row">
             <div class="stat-card ${bkBg}"><div class="stat-val ${bkClass}">${c.breakeven}</div><div class="stat-lbl">Breakeven tix (${pct(c.breakevenPct)})</div></div>
             <div class="stat-card"><div class="stat-val">${money(c.perTicketCost)}</div><div class="stat-lbl">Cost per ticket</div></div>
-            <div class="stat-card ${c.margin>=0?'bg-green':'bg-red'}"><div class="stat-val ${marginClass}">${pct(c.margin)}</div><div class="stat-lbl">Margin</div></div>
+            <div class="stat-card ${c.margin>=0?'bg-green':'bg-red'}"><div class="stat-val ${marginClass}">${pct(c.margin)}</div><div class="stat-lbl">Proj. margin</div></div>
           </div>
         </div>
 
-        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100);return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nt*c.price)}</span></div>`;}).join('')}</div></div>`:''}
+        <!-- Post-Show Actuals -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="card-title" style="margin-bottom:0">Post-Show Actuals</div>
+            <div class="check-item ${S.showActuals?'active':''}" onclick="S.showActuals=!S.showActuals;render()" style="padding:6px 12px;margin:0;width:auto;flex:none">
+              <input type="checkbox" ${S.showActuals?'checked':''} onclick="event.stopPropagation();S.showActuals=this.checked;render()">
+              <span style="font-size:12px">${S.showActuals?'On':'Off'}</span>
+            </div>
+          </div>
+          ${S.showActuals?`
+          <div style="padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-xs);margin-bottom:14px;font-size:12px;color:var(--accent);border-left:3px solid var(--accent)">Enter actual sales after the show to see your real P&amp;L vs projection.</div>
+
+          <div style="display:flex;gap:6px;margin-bottom:14px">
+            <button class="btn-secondary" style="flex:1;padding:8px 12px;font-size:12px;margin:0" onclick="$('ticketFileInput').click()">Upload Ticket CSV</button>
+            <button class="btn-secondary" style="flex:1;padding:8px 12px;font-size:12px;margin:0" onclick="showPasteModal('ticket')">Paste Ticket Data</button>
+            <button class="btn-secondary" style="flex:1;padding:8px 12px;font-size:12px;margin:0" onclick="$('merchFileInput').click()">Upload Merch CSV</button>
+            <button class="btn-secondary" style="flex:1;padding:8px 12px;font-size:12px;margin:0" onclick="showPasteModal('merch')">Paste Merch Data</button>
+          </div>
+          <label style="margin-top:0">Actual Tickets Sold</label>
+          ${S.specialEvent&&S.priceTiers.length>0?`
+          <div style="display:flex;gap:6px;margin-bottom:6px;margin-top:8px">
+            <div style="flex:1.5;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Tier</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Sold</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Revenue</div>
+          </div>
+          ${S.priceTiers.map((t,i)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <span style="flex:1.5;font-size:13px;font-weight:500;color:var(--text-secondary)">${escH(t.name)||'Tier '+(i+1)} (${money(t.price)})</span>
+            <input type="number" value="${S.actualTierSales[i]?S.actualTierSales[i].sold:0}" onchange="S.actualTierSales[${i}].sold=+this.value;render()" style="flex:1" min="0">
+            <span style="flex:1;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;text-align:right">${money((+(S.actualTierSales[i]?S.actualTierSales[i].sold:0))*(+t.price||0))}</span>
+          </div>`).join('')}
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Total: ${c.actuals.actTickets} tickets &middot; ${money(c.actuals.actGross)}</div>
+          `:`
+          <input type="number" value="${S.actualTicketsSold}" onchange="S.actualTicketsSold=+this.value;render()" min="0" style="font-size:16px;padding:10px">
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">of ${c.totalSeats} total seats &middot; ${money(c.actuals.actGross)} revenue</div>
+          `}
+
+          ${S.merchEnabled?`
+          <label style="margin-top:16px">Actual Merch Sold</label>
+          <div style="display:flex;gap:6px;margin-bottom:6px;margin-top:8px">
+            <div style="flex:1.5;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Item</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Qty Sold</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Revenue</div>
+          </div>
+          ${S.merchItems.map((m,i)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <span style="flex:1.5;font-size:13px;font-weight:500;color:var(--text-secondary)">${escH(m.name)||'Item '+(i+1)} (${money(m.price)})</span>
+            <input type="number" value="${S.actualMerchSold[i]?S.actualMerchSold[i].qtySold:0}" onchange="S.actualMerchSold[${i}].qtySold=+this.value;render()" style="flex:1" min="0">
+            <span style="flex:1;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;text-align:right">${money((+(S.actualMerchSold[i]?S.actualMerchSold[i].qtySold:0))*(+m.price||0))}</span>
+          </div>`).join('')}
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Total merch: ${money(c.actuals.actMerchGross)} &middot; JFA: ${money(c.actuals.actMerchVenueRev)} &middot; Artist: ${money(c.actuals.actMerchArtistRev)}</div>
+          `:''}
+
+          <div class="section-divider" style="margin-top:16px"></div>
+          <div class="card-title" style="margin-top:0">Actual P&amp;L</div>
+          <div class="result-block">
+            <div class="r-row"><span class="r-label">Actual ticket revenue</span><span class="r-value">${money(c.actuals.actGross)}</span></div>
+            ${c.actuals.actMerchVenueRev>0?`<div class="r-row"><span class="r-label">Merch commission (${S.merchVenuePct}%)</span><span class="r-value c-green">+${money(c.actuals.actMerchVenueRev)}</span></div>`:''}
+            ${c.actuals.actMerchVenueRev>0?`<div class="r-row" style="font-weight:600"><span class="r-label">Total actual revenue</span><span class="r-value">${money(c.actuals.actTotalVenueRevenue)}</span></div>`:''}
+            <div class="r-row"><span class="r-label">Artist payment</span><span class="r-value c-red">-${money(c.actuals.actArtistPay)}</span></div>
+            <div class="r-row"><span class="r-label">Venue expenses</span><span class="r-value c-red">-${money(c.baseExpenses)}</span></div>
+            ${c.hotelCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Hotel</span><span class="r-value c-red">-${money(c.hotelCost)}</span></div>`:''}
+            ${c.driverCost>0?`<div class="r-row"><span class="r-label" style="padding-left:8px">Transportation</span><span class="r-value c-red">-${money(c.driverCost)}</span></div>`:''}
+            <div class="r-row total"><span class="r-label">Actual venue net</span><span class="r-value ${c.actuals.actVenueNet>=0?'c-green':'c-red'}">${money(c.actuals.actVenueNet)}</span></div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-card"><div class="stat-val">${c.actuals.actTickets}</div><div class="stat-lbl">Tickets sold</div></div>
+            <div class="stat-card"><div class="stat-val ${c.actuals.actVenueNet>=0?'c-green':'c-red'}">${money(c.actuals.actVenueNet)}</div><div class="stat-lbl">Actual net</div></div>
+            <div class="stat-card ${c.actuals.actVenueNet>=c.venueNet?'bg-green':'bg-red'}"><div class="stat-val ${c.actuals.actVenueNet>=c.venueNet?'c-green':'c-red'}">${money(c.actuals.actVenueNet-c.venueNet)}</div><div class="stat-lbl">vs Projection</div></div>
+          </div>
+          `:`
+          <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">Toggle on after the show to enter actual ticket &amp; merch sales and see your real P&amp;L.</div>
+          `}
+        </div>
+
+        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100),nightRev=S.specialEvent&&c.tierDetails.length>0?Math.round(c.tierDetails.reduce((s,t)=>s+t.perSet,0)*n.sets*S.projectedAttendance/100):nt*c.price;return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nightRev)}</span></div>`;}).join('')}</div></div>`:''}
 
         <!-- Backline & Hospitality -->
         <div class="card">
@@ -487,7 +646,7 @@ function render(){
           ${S.hotelProvided?`
           <div class="row">
             <div>
-              <label>Nights</label>
+              <label>Nights (all rooms)</label>
               <select onchange="S.hotelNights=+this.value;render()">
                 <option value="1" ${S.hotelNights===1?'selected':''}>1 night</option>
                 <option value="2" ${S.hotelNights===2?'selected':''}>2 nights</option>
@@ -495,34 +654,28 @@ function render(){
                 <option value="4" ${S.hotelNights===4?'selected':''}>4 nights</option>
               </select>
             </div>
-            <div>
-              <label>Rooms</label>
-              <select onchange="S.hotelRooms=+this.value;render()">
-                <option value="1" ${S.hotelRooms===1?'selected':''}>1 room</option>
-                <option value="2" ${S.hotelRooms===2?'selected':''}>2 rooms</option>
-                <option value="3" ${S.hotelRooms===3?'selected':''}>3 rooms</option>
-                <option value="4" ${S.hotelRooms===4?'selected':''}>4 rooms</option>
-              </select>
-            </div>
           </div>
-          <div class="row">
-            <div>
-              <label>Room Type</label>
-              <select onchange="S.hotelRoomType=this.value;render()">
-                <option ${S.hotelRoomType==='Standard'?'selected':''}>Standard</option>
-                <option ${S.hotelRoomType==='Queen'?'selected':''}>Queen</option>
-                <option ${S.hotelRoomType==='King'?'selected':''}>King</option>
-                <option ${S.hotelRoomType==='Suite'?'selected':''}>Suite</option>
-                <option ${S.hotelRoomType==='Double Queen'?'selected':''}>Double Queen</option>
+          <div style="margin-top:10px">
+            <div style="display:flex;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);padding:0 4px;margin-bottom:4px">
+              <span style="flex:1.2">Room Type</span><span style="flex:1">Cost / Night</span><span style="width:28px"></span>
+            </div>
+            ${S.hotelRooms.map((rm,i)=>`
+            <div class="expense-row" style="margin-top:4px">
+              <select style="flex:1.2" onchange="S.hotelRooms[${i}].type=this.value;render()">
+                <option ${rm.type==='Standard'?'selected':''}>Standard</option>
+                <option ${rm.type==='Queen'?'selected':''}>Queen</option>
+                <option ${rm.type==='King'?'selected':''}>King</option>
+                <option ${rm.type==='Suite'?'selected':''}>Suite</option>
+                <option ${rm.type==='Double Queen'?'selected':''}>Double Queen</option>
               </select>
-            </div>
-            <div>
-              <label>Cost / Night</label>
-              <input type="number" value="${S.hotelCostPerNight}" onchange="S.hotelCostPerNight=+this.value;render()">
-            </div>
+              <input type="number" style="flex:1" value="${rm.costPerNight}" onchange="S.hotelRooms[${i}].costPerNight=+this.value;render()">
+              ${S.hotelRooms.length>1?`<button class="expense-remove" onclick="S.hotelRooms.splice(${i},1);render()">&times;</button>`:'<span style="width:28px"></span>'}
+            </div>`).join('')}
+            ${S.hotelRooms.length<4?`<button class="expense-add" style="margin-top:8px" onclick="S.hotelRooms.push({type:'Standard',costPerNight:150});render()">+ Add room</button>`:''}
           </div>
           <div class="result-block" style="margin-top:10px">
-            <div class="r-row"><span class="r-label">${S.hotelRooms} ${S.hotelRoomType} &times; ${S.hotelNights} night${S.hotelNights>1?'s':''} &times; ${money(S.hotelCostPerNight)}</span><span class="r-value c-red">${money(c.hotelCost)}</span></div>
+            ${S.hotelRooms.map((rm,i)=>`<div class="r-row"><span class="r-label">Room ${i+1}: ${rm.type} &times; ${S.hotelNights} night${S.hotelNights>1?'s':''} &times; ${money(rm.costPerNight)}</span><span class="r-value c-red">${money((+rm.costPerNight||0)*S.hotelNights)}</span></div>`).join('')}
+            ${S.hotelRooms.length>1?`<div class="r-row total"><span class="r-label">Total hotel</span><span class="r-value c-red">${money(c.hotelCost)}</span></div>`:''}
           </div>
           `:''}
 
@@ -602,11 +755,13 @@ window.generateEmail=function(){
   detailItems.push(`Doors: ${fmt12(S.doorsTime)}`);
   if(S.soundcheck) detailItems.push('Soundcheck: coordinated in advance');
   if(S.parking) detailItems.push('Parking available onsite');
-  if(S.hotelProvided) detailItems.push(`Hotel: ${S.hotelRooms} ${S.hotelRoomType} room${S.hotelRooms>1?'s':''}, ${S.hotelNights} night${S.hotelNights>1?'s':''}`);
-  else detailItems.push('No hotel provided unless otherwise agreed');
+  if(S.hotelProvided) {
+    const roomDesc = S.hotelRooms.length===1 ? `1 ${S.hotelRooms[0].type} room` : S.hotelRooms.map((r,i)=>`${r.type}`).join(', ')+` (${S.hotelRooms.length} rooms)`;
+    detailItems.push(`Hotel: ${roomDesc}, ${S.hotelNights} night${S.hotelNights>1?'s':''}`);
+  } else detailItems.push('No hotel provided unless otherwise agreed');
   if(S.driverProvided) detailItems.push(`Transportation: ${S.driverType} service provided${S.driverNotes?' ('+S.driverNotes+')':''}`);
 
-  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${fmt12(S.set1Time)} & ${fmt12(S.set2Time)})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n$${c.price} per ticket\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
+  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${fmt12(S.set1Time)} & ${fmt12(S.set2Time)})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n${S.specialEvent&&S.priceTiers.length>0?S.priceTiers.map(t=>`${t.name||'Tier'}: ${t.seats} seats at $${t.price}`).join('\n'):`$${c.price} per ticket`}\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
 
   if(S.exclusivityEnabled){
     email+=`\n\n\nExclusivity\n\nStandard ${S.exclusivityDays}-day radius clause (${S.exclusivityMiles} miles)${S.exclusivityExclude?`, excluding ${S.exclusivityExclude}`:''}`;
@@ -681,12 +836,12 @@ window.generatePrint=function(){
       ${S.dealType==='vs'?`<tr><td>Guarantee</td><td>${money(S.guarantee)}</td></tr><tr><td>OR ${S.artistPct}% of Gross Revenue</td><td style="font-family:Inter,sans-serif">Whichever is greater</td></tr>`:''}
       ${S.dealType==='door'?`<tr><td>${S.doorPct}% of Gross Revenue</td><td style="font-family:Inter,sans-serif">No guarantee</td></tr>`:''}
       ${S.dealType==='plus'?`<tr><td>Guarantee</td><td>${money(S.plusGuarantee)}</td></tr><tr><td>Plus ${S.plusPct}% Above Breakeven</td><td>${money(c.venueCost)}</td></tr>`:''}
-      <tr><td>Ticket Price</td><td>${money(c.price)}</td></tr>
+      ${S.specialEvent&&c.tierDetails.length>0?c.tierDetails.map(t=>`<tr><td>${escH(t.name)||'Tier'} (${t.seats} seats)</td><td>${money(t.price)}</td></tr>`).join(''):`<tr><td>Ticket Price</td><td>${money(c.price)}</td></tr>`}
     </table>
 
     <h3>Backline &amp; Hospitality</h3>
     <ul class="os-list">${backlineList.map(b=>`<li>${b}</li>`).join('')}</ul>
-    ${S.hotelProvided?`<table style="margin-top:8px"><tr><td>Hotel</td><td style="font-family:Inter,sans-serif">${S.hotelRooms} ${escH(S.hotelRoomType)} room${S.hotelRooms>1?'s':''}, ${S.hotelNights} night${S.hotelNights>1?'s':''} (${money(c.hotelCost)})</td></tr></table>`:''}
+    ${S.hotelProvided?`<table style="margin-top:8px"><tr><td>Hotel</td><td style="font-family:Inter,sans-serif">${S.hotelRooms.map((r,i)=>`${r.type} (${money(r.costPerNight)}/nt)`).join(', ')} &mdash; ${S.hotelNights} night${S.hotelNights>1?'s':''} (${money(c.hotelCost)} total)</td></tr></table>`:''}
     ${S.parking?'<p style="margin-top:4px;font-size:13px;color:#5b6478">Parking available onsite</p>':''}
     ${S.driverProvided?`<table style="margin-top:8px"><tr><td>Transportation</td><td style="font-family:Inter,sans-serif">${escH(S.driverType)} service (${money(c.driverCost)})${S.driverNotes?' — '+escH(S.driverNotes):''}</td></tr></table>`:''}
 
@@ -703,7 +858,7 @@ window.generatePrint=function(){
       <tr><td>Artist Payment</td><td>${money(c.artistPay)}</td></tr>
       ${allExp.map(e=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(e.name)}</td><td style="color:#8b93a7">${money(e.amount)}</td></tr>`).join('')}
       <tr><td>Venue Expenses</td><td>${money(c.baseExpenses)}</td></tr>
-      ${c.hotelCost>0?`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">Hotel (${S.hotelRooms} ${escH(S.hotelRoomType)} &times; ${S.hotelNights} nts)</td><td style="color:#8b93a7">${money(c.hotelCost)}</td></tr>`:''}
+      ${c.hotelCost>0?S.hotelRooms.map((r,i)=>`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">${escH(r.type)} room &times; ${S.hotelNights} nts &times; ${money(r.costPerNight)}</td><td style="color:#8b93a7">${money((+r.costPerNight||0)*S.hotelNights)}</td></tr>`).join(''):''}
       ${c.driverCost>0?`<tr><td style="padding-left:16px;color:#8b93a7;font-weight:400">Transportation (${escH(S.driverType)})</td><td style="color:#8b93a7">${money(c.driverCost)}</td></tr>`:''}
       <tr class="os-total"><td>Venue Net</td><td style="color:${c.venueNet>=0?'#10b981':'#ef4444'}">${money(c.venueNet)}</td></tr>
     </table>
@@ -711,14 +866,224 @@ window.generatePrint=function(){
 
     ${S.notes?`<h3>Additional Terms</h3><div class="os-notes">${escH(S.notes).replace(/\n/g,'<br>')}</div>`:''}
 
-    <div class="os-footer">Jazz Forum Arts &middot; 1 Dixon Lane, Tarrytown, NY 10591 &middot; jazzforumarts.org<br>This is a preliminary offer and is not a binding contract.</div>`;
+    ${S.showActuals?`
+    <h3>Post-Show Actuals</h3>
+    <table>
+      <tr><td>Actual Tickets Sold</td><td>${c.actuals.actTickets} of ${c.totalSeats}</td></tr>
+      <tr><td>Actual Ticket Revenue</td><td>${money(c.actuals.actGross)}</td></tr>
+      ${c.actuals.actMerchVenueRev>0?`<tr><td>Actual Merch Revenue</td><td>${money(c.actuals.actMerchGross)}</td></tr><tr><td>Merch Commission (${S.merchVenuePct}%)</td><td>+${money(c.actuals.actMerchVenueRev)}</td></tr>`:''}
+      <tr><td>Artist Payment (Actual)</td><td>${money(c.actuals.actArtistPay)}</td></tr>
+      <tr><td>Venue Expenses</td><td>${money(c.totalExpenses)}</td></tr>
+      <tr class="os-total"><td>Actual Venue Net</td><td style="color:${c.actuals.actVenueNet>=0?'#10b981':'#ef4444'}">${money(c.actuals.actVenueNet)}</td></tr>
+    </table>
+    <table style="margin-top:8px">
+      <tr><td>vs Projection</td><td style="color:${c.actuals.actVenueNet>=c.venueNet?'#10b981':'#ef4444'}">${money(c.actuals.actVenueNet-c.venueNet)}</td></tr>
+    </table>
+    `:''}
+
+    <div class="os-footer">Jazz Forum Arts &middot; 1 Dixon Lane, Tarrytown, NY 10591 &middot; jazzforumarts.org<br>${S.showActuals?'Post-show settlement report.':'This is a preliminary offer and is not a binding contract.'}</div>`;
 
   $('offerSummary').classList.add('visible');
   $('offerSummary').scrollIntoView({behavior:'smooth'});
   setTimeout(()=>window.print(),600);
 };
 
+// ── Import Functions ──
+
+// CSV parser (handles quoted fields, commas in values)
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  return lines.map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQ) { if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; } else if (ch === '"') inQ = false; else cur += ch; }
+      else { if (ch === '"') inQ = true; else if (ch === ',' || ch === '\t') { cols.push(cur.trim()); cur = ''; } else cur += ch; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
+}
+
+// Import merch from CSV (matches JFA Merch Settlement Sheet format)
+// Expects vertical layout: rows for Item Description, Price, Sales (Units) across columns
+// OR horizontal layout: columns for Item, Price, Qty
+window.importMerchCSV = function(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) { alert('Could not parse merch data. Please check the format.'); return; }
+
+  // Try to detect JFA vertical format (Item Description in col A, data in cols B+)
+  const labels = rows.map(r => (r[0]||'').toLowerCase().trim());
+  const descIdx = labels.findIndex(l => l.includes('item description'));
+  const typeIdx = labels.findIndex(l => l.includes('merch type'));
+  const priceIdx = labels.findIndex(l => l.includes('price'));
+  const salesIdx = labels.findIndex(l => l.includes('sales'));
+
+  if (descIdx >= 0 && priceIdx >= 0 && salesIdx >= 0) {
+    // JFA vertical format detected
+    const descRow = rows[descIdx], priceRow = rows[priceIdx], salesRow = rows[salesIdx];
+    const items = [];
+    for (let c = 1; c < descRow.length; c++) {
+      const name = descRow[c] || (rows[typeIdx] ? rows[typeIdx][c] : '');
+      const price = parseFloat((priceRow[c]||'').replace(/[$,]/g,'')) || 0;
+      const qty = parseInt(salesRow[c]) || 0;
+      if (name || price > 0 || qty > 0) {
+        items.push({ name: name || 'Item ' + c, price, sold: qty });
+      }
+    }
+    if (items.length > 0) {
+      // Update merch items and actuals
+      S.merchItems = items.map(m => ({ name: m.name, price: m.price, qtyPerNight: 0 }));
+      S.actualMerchSold = items.map(m => ({ qtySold: m.sold }));
+      S.merchEnabled = true;
+      render();
+      showToast('Imported ' + items.length + ' merch items from settlement sheet');
+      return;
+    }
+  }
+
+  // Try horizontal format: header row with Item/Name, Price, Qty/Sold columns
+  const header = rows[0].map(h => h.toLowerCase().trim());
+  const nameCol = header.findIndex(h => h.includes('item') || h.includes('name') || h.includes('description'));
+  const priceCol = header.findIndex(h => h.includes('price'));
+  const qtyCol = header.findIndex(h => h.includes('qty') || h.includes('sold') || h.includes('units') || h.includes('quantity'));
+
+  if (nameCol >= 0 || priceCol >= 0) {
+    const items = [];
+    for (let r = 1; r < rows.length; r++) {
+      const name = nameCol >= 0 ? rows[r][nameCol] || '' : '';
+      const price = priceCol >= 0 ? parseFloat((rows[r][priceCol]||'').replace(/[$,]/g,'')) || 0 : 0;
+      const qty = qtyCol >= 0 ? parseInt(rows[r][qtyCol]) || 0 : 0;
+      if (name || price > 0) items.push({ name, price, sold: qty });
+    }
+    if (items.length > 0) {
+      S.merchItems = items.map(m => ({ name: m.name, price: m.price, qtyPerNight: 0 }));
+      S.actualMerchSold = items.map(m => ({ qtySold: m.sold }));
+      S.merchEnabled = true;
+      render();
+      showToast('Imported ' + items.length + ' merch items');
+      return;
+    }
+  }
+
+  alert('Could not detect merch columns. Make sure your CSV has Item Description, Price, and Sales rows or columns.');
+};
+
+// Import tickets from CSV (flexible Spectrix/generic format)
+window.importTicketCSV = function(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) { alert('Could not parse ticket data.'); return; }
+
+  const header = rows[0].map(h => h.toLowerCase().trim());
+  const qtyCol = header.findIndex(h => h.includes('qty') || h.includes('quantity') || h.includes('sold') || h.includes('tickets') || h.includes('count') || h.includes('admissions'));
+  const priceCol = header.findIndex(h => h.includes('price') || h.includes('amount') || h.includes('value'));
+  const tierCol = header.findIndex(h => h.includes('tier') || h.includes('type') || h.includes('category') || h.includes('ticket type') || h.includes('price band'));
+  const totalCol = header.findIndex(h => h.includes('total') || h.includes('revenue') || h.includes('gross'));
+
+  if (qtyCol < 0 && totalCol < 0) {
+    // Maybe it's a single summary row or simple format
+    // Try to find any number that looks like ticket count
+    let totalTickets = 0;
+    for (let r = 1; r < rows.length; r++) {
+      for (let c = 0; c < rows[r].length; c++) {
+        const val = parseInt(rows[r][c]);
+        if (val > 0 && val < 10000) { totalTickets += val; break; }
+      }
+    }
+    if (totalTickets > 0) {
+      S.actualTicketsSold = totalTickets;
+      render();
+      showToast('Imported ' + totalTickets + ' tickets');
+      return;
+    }
+    alert('Could not detect ticket columns. Look for columns like Quantity, Tickets, Sold, or Count.');
+    return;
+  }
+
+  // If we have tiers and special event pricing is on, try to match tiers
+  if (tierCol >= 0 && S.specialEvent && S.priceTiers.length > 0) {
+    const tierTotals = {};
+    for (let r = 1; r < rows.length; r++) {
+      const tier = (rows[r][tierCol]||'').trim();
+      const qty = qtyCol >= 0 ? parseInt(rows[r][qtyCol]) || 0 : 0;
+      if (tier) tierTotals[tier] = (tierTotals[tier]||0) + qty;
+    }
+    // Try to match CSV tiers to our price tiers by name
+    const tierNames = Object.keys(tierTotals);
+    let matched = 0;
+    S.priceTiers.forEach((pt, i) => {
+      const match = tierNames.find(tn => tn.toLowerCase().includes(pt.name.toLowerCase()) || pt.name.toLowerCase().includes(tn.toLowerCase()));
+      if (match) { S.actualTierSales[i] = { sold: tierTotals[match] }; matched++; }
+    });
+    if (matched > 0) {
+      render();
+      showToast('Imported ticket data for ' + matched + ' tier(s)');
+      return;
+    }
+  }
+
+  // Sum all ticket quantities
+  let totalTickets = 0;
+  for (let r = 1; r < rows.length; r++) {
+    totalTickets += qtyCol >= 0 ? (parseInt(rows[r][qtyCol]) || 0) : 0;
+  }
+  S.actualTicketsSold = totalTickets;
+  // Also fill tier sales if tiered (distribute proportionally by seat allocation)
+  if (S.specialEvent && S.priceTiers.length > 0) {
+    const totalTierSeats = S.priceTiers.reduce((s,t)=>s+(+t.seats||0),0);
+    S.priceTiers.forEach((pt, i) => {
+      S.actualTierSales[i] = { sold: totalTierSeats > 0 ? Math.round(totalTickets * (pt.seats / totalTierSeats)) : 0 };
+    });
+  }
+  render();
+  showToast('Imported ' + totalTickets + ' tickets');
+};
+
+// File reader helper
+function readFileAsText(file, callback) {
+  const reader = new FileReader();
+  reader.onload = e => callback(e.target.result);
+  reader.readAsText(file);
+}
+
+// Paste modal
+window.showPasteModal = function(type) {
+  const title = type === 'merch' ? 'Paste Merch Data' : 'Paste Ticket Data';
+  const hint = type === 'merch'
+    ? 'Paste CSV data from your merch settlement sheet.\nCopy from Numbers/Sheets/Excel and paste here.'
+    : 'Paste CSV data from Spectrix or your ticketing system.\nCopy from the export and paste here.';
+  $('emailModal').innerHTML = `
+    <div class="email-overlay" onclick="if(event.target===this)closePaste()">
+      <div class="email-modal">
+        <h2>${title}</h2>
+        <div class="em-sub">${hint}</div>
+        <textarea id="pasteArea" style="width:100%;min-height:200px;font-family:'DM Mono',monospace;font-size:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--surface-alt)" placeholder="Paste data here (CSV or tab-separated)..."></textarea>
+        <div class="em-actions">
+          <button class="btn-primary" onclick="processPaste('${type}')">Import</button>
+          <button class="btn-secondary" onclick="closePaste()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(() => $('pasteArea').focus(), 100);
+};
+window.closePaste = function() { $('emailModal').innerHTML = ''; };
+window.processPaste = function(type) {
+  const text = $('pasteArea').value;
+  if (!text.trim()) { alert('No data pasted.'); return; }
+  closePaste();
+  if (type === 'merch') importMerchCSV(text);
+  else importTicketCSV(text);
+};
+
+function showToast(msg) {
+  $('toastArea').innerHTML = '<div class="copy-toast">' + msg + '</div>';
+  setTimeout(() => $('toastArea').innerHTML = '', 3000);
+}
+
 render();
 </script>
+<!-- Hidden file inputs for imports -->
+<input type="file" id="merchFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="if(this.files[0]){readFileAsText(this.files[0],importMerchCSV);this.value=''}">
+<input type="file" id="ticketFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="if(this.files[0]){readFileAsText(this.files[0],importTicketCSV);this.value=''}">
 </body>
 </html>
