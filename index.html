@@ -198,6 +198,12 @@ const S = {
   // Set times
   set1Time: '19:00', set2Time: '21:30', set3Time: '23:30', setLength: 70,
   doorsTime: '17:50',
+  customDayTimes: false,
+  dayTimes: {
+    fri: { set1: '19:00', set2: '21:30', set3: '23:30', doors: '17:50' },
+    sat: { set1: '19:00', set2: '21:30', set3: '23:30', doors: '17:50' },
+    sun: { set1: '17:00', set2: '19:30', set3: '', doors: '15:50' },
+  },
   // Pricing
   ticketPrice: 45, specialEvent: false,
   priceTiers: [
@@ -262,6 +268,22 @@ const fmt12 = t => { if(!t)return''; const [h,m]=t.split(':'); const hr=+h; retu
 const has3Sets = () => S.friSets>=3||S.satSets>=3||S.sunSets>=3;
 const maxSets = () => Math.max(S.friSets,S.satSets,S.sunSets);
 const setTimesStr = (sep) => { let s=fmt12(S.set1Time)+sep+fmt12(S.set2Time); if(has3Sets()) s+=sep+fmt12(S.set3Time); return s; };
+// Per-day time helpers
+const dayKey = day => day==='Friday'?'fri':day==='Saturday'?'sat':'sun';
+function getDayTimes(day) {
+  if (!S.customDayTimes) return { set1: S.set1Time, set2: S.set2Time, set3: S.set3Time, doors: S.doorsTime };
+  const dk = dayKey(day);
+  const dt = S.dayTimes[dk] || {};
+  return { set1: dt.set1||S.set1Time, set2: dt.set2||S.set2Time, set3: dt.set3||S.set3Time, doors: dt.doors||S.doorsTime };
+}
+function dayTimesStr(day, sep) {
+  const t = getDayTimes(day);
+  let s = fmt12(t.set1)+sep+fmt12(t.set2);
+  const dk = dayKey(day);
+  const sets = dk==='fri'?S.friSets:dk==='sat'?S.satSets:S.sunSets;
+  if (sets>=3 && t.set3) s+=sep+fmt12(t.set3);
+  return s;
+}
 
 // ── Save / Load System ──
 const STORAGE_KEY = 'jfa_offers';
@@ -379,6 +401,8 @@ window.newOffer = function() {
     friday:true,saturday:true,sunday:true,
     friSets:2,satSets:2,sunSets:2,seatsPerSet:90,
     set1Time:'19:00',set2Time:'21:30',set3Time:'23:30',setLength:70,doorsTime:'17:50',
+    customDayTimes:false,
+    dayTimes:{fri:{set1:'19:00',set2:'21:30',set3:'23:30',doors:'17:50'},sat:{set1:'19:00',set2:'21:30',set3:'23:30',doors:'17:50'},sun:{set1:'17:00',set2:'19:30',set3:'',doors:'15:50'}},
     ticketPrice:45,specialEvent:false,
     priceTiers:[{name:'Premium',seats:30,price:250},{name:'Standard',seats:60,price:150}],
     projectedAttendance:85,
@@ -785,15 +809,37 @@ function render(){
 
           <div class="section-divider"></div>
           <div class="card-title" style="margin-top:0">Set Times</div>
+          ${!S.customDayTimes?`
           <div class="row">
             <div><label>Set 1</label><input type="time" value="${S.set1Time}" onchange="S.set1Time=this.value;render()"></div>
             <div><label>Set 2</label><input type="time" value="${S.set2Time}" onchange="S.set2Time=this.value;render()"></div>
-            ${(S.friSets>=3||S.satSets>=3||S.sunSets>=3)?`<div><label>Set 3</label><input type="time" value="${S.set3Time}" onchange="S.set3Time=this.value;render()"></div>`:''}
+            ${has3Sets()?`<div><label>Set 3</label><input type="time" value="${S.set3Time}" onchange="S.set3Time=this.value;render()"></div>`:''}
             <div><label>Length (min)</label><input type="number" value="${S.setLength}" onchange="S.setLength=+this.value;render()"></div>
           </div>
           <div class="row" style="margin-top:6px">
             <div><label>Doors</label><input type="time" value="${S.doorsTime}" onchange="S.doorsTime=this.value;render()"></div>
             <div></div><div></div>
+          </div>
+          `:`
+          <div class="row" style="margin-bottom:8px">
+            <div><label>Set length (min)</label><input type="number" value="${S.setLength}" onchange="S.setLength=+this.value;render()"></div>
+          </div>
+          ${[{day:'Friday',key:'fri',on:S.friday,sets:S.friSets},{day:'Saturday',key:'sat',on:S.saturday,sets:S.satSets},{day:'Sunday',key:'sun',on:S.sunday,sets:S.sunSets}].filter(d=>d.on).map(d=>`
+          <div style="background:var(--surface-alt);border:1px solid var(--border-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px${!d.on?';opacity:0.3':''}">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:6px">${d.day}</div>
+            <div class="row" style="gap:6px">
+              <div><label style="font-size:11px;margin-top:0">Set 1</label><input type="time" value="${S.dayTimes[d.key].set1}" onchange="S.dayTimes.${d.key}.set1=this.value;render()" style="font-size:12px;padding:6px 8px"></div>
+              <div><label style="font-size:11px;margin-top:0">Set 2</label><input type="time" value="${S.dayTimes[d.key].set2}" onchange="S.dayTimes.${d.key}.set2=this.value;render()" style="font-size:12px;padding:6px 8px"></div>
+              ${d.sets>=3?`<div><label style="font-size:11px;margin-top:0">Set 3</label><input type="time" value="${S.dayTimes[d.key].set3}" onchange="S.dayTimes.${d.key}.set3=this.value;render()" style="font-size:12px;padding:6px 8px"></div>`:''}
+              <div><label style="font-size:11px;margin-top:0">Doors</label><input type="time" value="${S.dayTimes[d.key].doors}" onchange="S.dayTimes.${d.key}.doors=this.value;render()" style="font-size:12px;padding:6px 8px"></div>
+            </div>
+          </div>`).join('')}
+          `}
+          <div class="check-group" style="margin-top:8px">
+            <div class="check-item ${S.customDayTimes?'active':''}" onclick="S.customDayTimes=!S.customDayTimes;render()" style="padding:6px 10px">
+              <input type="checkbox" ${S.customDayTimes?'checked':''} onclick="event.stopPropagation();S.customDayTimes=this.checked;render()">
+              <span style="font-size:12px">Different times per day</span>
+            </div>
           </div>
         </div>
 
@@ -1223,7 +1269,8 @@ window.generateEmail=function(){
   if(S.greenRoom) backlineItems.push('Green room with water, beer, wine');
 
   const detailItems=[];
-  detailItems.push(`Doors: ${fmt12(S.doorsTime)}`);
+  if(S.customDayTimes) detailItems.push(`Doors: ${c.nights.map(n=>`${n.abbr} ${fmt12(getDayTimes(n.day).doors)}`).join(', ')}`);
+  else detailItems.push(`Doors: ${fmt12(S.doorsTime)}`);
   if(S.soundcheck) detailItems.push('Soundcheck: coordinated in advance');
   if(S.parking) detailItems.push('Parking available onsite');
   if(S.hotelProvided) {
@@ -1232,7 +1279,7 @@ window.generateEmail=function(){
   } else detailItems.push('No hotel provided unless otherwise agreed');
   if(S.driverProvided) detailItems.push(`Transportation: ${S.driverType} service provided${S.driverNotes?' ('+S.driverNotes+')':''}`);
 
-  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${setTimesStr(' & ')})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n${S.specialEvent&&S.priceTiers.length>0?S.priceTiers.map(t=>`${t.name||'Tier'}: ${t.seats} seats at $${t.price}`).join('\n'):`$${c.price} per ticket`}\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
+  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${S.customDayTimes?c.nights.map(n=>`${n.abbr}: ${n.sets} x ${S.setLength}-min (${dayTimesStr(n.day,' & ')})`).join(', '):`${setsPerNight} x ${S.setLength}-minute sets per night (${setTimesStr(' & ')})`}\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n${S.specialEvent&&S.priceTiers.length>0?S.priceTiers.map(t=>`${t.name||'Tier'}: ${t.seats} seats at $${t.price}`).join('\n'):`$${c.price} per ticket`}\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
 
   if(S.exclusivityEnabled){
     email+=`\n\n\nExclusivity\n\nStandard ${S.exclusivityDays}-day radius clause (${S.exclusivityMiles} miles)${S.exclusivityExclude?`, excluding ${S.exclusivityExclude}`:''}`;
@@ -1295,10 +1342,10 @@ window.generatePrint=function(){
       <tr><td>Contact</td><td style="font-family:Inter,sans-serif">${escH(S.agentName)||'TBD'}</td></tr>
       <tr><td>Date(s)</td><td style="font-family:Inter,sans-serif">${escH(S.showDate)||'TBD'}</td></tr>
       <tr><td>Venue</td><td style="font-family:Inter,sans-serif">The Jazz Forum</td></tr>
-      <tr><td>Sets</td><td style="font-family:Inter,sans-serif">${S.setLength}-min sets at ${setTimesStr(' &amp; ')}</td></tr>
+      ${S.customDayTimes?c.nights.map(n=>`<tr><td>${n.day} sets</td><td style="font-family:Inter,sans-serif">${n.sets} &times; ${S.setLength}-min at ${dayTimesStr(n.day,' &amp; ')} (doors ${fmt12(getDayTimes(n.day).doors)})</td></tr>`).join(''):`<tr><td>Sets</td><td style="font-family:Inter,sans-serif">${S.setLength}-min sets at ${setTimesStr(' &amp; ')}</td></tr>`}
       <tr><td>Schedule</td><td style="font-family:Inter,sans-serif">${nightsText}</td></tr>
       <tr><td>Capacity</td><td>${c.totalSeats} total (${S.seatsPerSet}/set)</td></tr>
-      <tr><td>Doors</td><td style="font-family:Inter,sans-serif">${fmt12(S.doorsTime)}</td></tr>
+      ${S.customDayTimes?'':`<tr><td>Doors</td><td style="font-family:Inter,sans-serif">${fmt12(S.doorsTime)}</td></tr>`}
     </table>
 
     <h3>Compensation &mdash; ${c.dealLabel}</h3>
