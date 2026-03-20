@@ -167,7 +167,7 @@ const S = {
   friSets: 2, satSets: 2, sunSets: 2,
   seatsPerSet: 90,
   // Set times
-  set1Time: '19:00', set2Time: '21:30', setLength: 70,
+  set1Time: '19:00', set2Time: '21:30', set3Time: '23:30', setLength: 70,
   doorsTime: '17:50',
   // Pricing
   ticketPrice: 45, specialEvent: false,
@@ -224,6 +224,9 @@ const $ = id => document.getElementById(id);
 const money = n => (n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
 const pct = n => n.toFixed(1)+'%';
 const fmt12 = t => { if(!t)return''; const [h,m]=t.split(':'); const hr=+h; return `${hr>12?hr-12:hr||12}:${m} ${hr>=12?'PM':'AM'}`; };
+const has3Sets = () => S.friSets>=3||S.satSets>=3||S.sunSets>=3;
+const maxSets = () => Math.max(S.friSets,S.satSets,S.sunSets);
+const setTimesStr = (sep) => { let s=fmt12(S.set1Time)+sep+fmt12(S.set2Time); if(has3Sets()) s+=sep+fmt12(S.set3Time); return s; };
 
 function calc() {
   const nights = [];
@@ -361,9 +364,9 @@ function render(){
             <div class="check-item ${S.sunday?'active':''}" onclick="S.sunday=!S.sunday;render()"><input type="checkbox" ${S.sunday?'checked':''} onclick="event.stopPropagation();S.sunday=this.checked;render()"><span>Sun</span></div>
           </div>
           <div class="night-config">
-            <div class="night-box ${S.friday?'':'off'}"><h4>Fri</h4><select onchange="S.friSets=+this.value;render()"><option value="1" ${S.friSets===1?'selected':''}>1 set</option><option value="2" ${S.friSets===2?'selected':''}>2 sets</option></select></div>
-            <div class="night-box ${S.saturday?'':'off'}"><h4>Sat</h4><select onchange="S.satSets=+this.value;render()"><option value="1" ${S.satSets===1?'selected':''}>1 set</option><option value="2" ${S.satSets===2?'selected':''}>2 sets</option></select></div>
-            <div class="night-box ${S.sunday?'':'off'}"><h4>Sun</h4><select onchange="S.sunSets=+this.value;render()"><option value="1" ${S.sunSets===1?'selected':''}>1 set</option><option value="2" ${S.sunSets===2?'selected':''}>2 sets</option></select></div>
+            <div class="night-box ${S.friday?'':'off'}"><h4>Fri</h4><select onchange="S.friSets=+this.value;render()"><option value="1" ${S.friSets===1?'selected':''}>1 set</option><option value="2" ${S.friSets===2?'selected':''}>2 sets</option><option value="3" ${S.friSets===3?'selected':''}>3 sets</option></select></div>
+            <div class="night-box ${S.saturday?'':'off'}"><h4>Sat</h4><select onchange="S.satSets=+this.value;render()"><option value="1" ${S.satSets===1?'selected':''}>1 set</option><option value="2" ${S.satSets===2?'selected':''}>2 sets</option><option value="3" ${S.satSets===3?'selected':''}>3 sets</option></select></div>
+            <div class="night-box ${S.sunday?'':'off'}"><h4>Sun</h4><select onchange="S.sunSets=+this.value;render()"><option value="1" ${S.sunSets===1?'selected':''}>1 set</option><option value="2" ${S.sunSets===2?'selected':''}>2 sets</option><option value="3" ${S.sunSets===3?'selected':''}>3 sets</option></select></div>
           </div>
           <label>Seats per set</label>
           <input type="number" value="${S.seatsPerSet}" onchange="S.seatsPerSet=+this.value;render()">
@@ -373,6 +376,7 @@ function render(){
           <div class="row">
             <div><label>Set 1</label><input type="time" value="${S.set1Time}" onchange="S.set1Time=this.value;render()"></div>
             <div><label>Set 2</label><input type="time" value="${S.set2Time}" onchange="S.set2Time=this.value;render()"></div>
+            ${(S.friSets>=3||S.satSets>=3||S.sunSets>=3)?`<div><label>Set 3</label><input type="time" value="${S.set3Time}" onchange="S.set3Time=this.value;render()"></div>`:''}
             <div><label>Length (min)</label><input type="number" value="${S.setLength}" onchange="S.setLength=+this.value;render()"></div>
           </div>
           <div class="row" style="margin-top:6px">
@@ -761,7 +765,7 @@ window.generateEmail=function(){
   } else detailItems.push('No hotel provided unless otherwise agreed');
   if(S.driverProvided) detailItems.push(`Transportation: ${S.driverType} service provided${S.driverNotes?' ('+S.driverNotes+')':''}`);
 
-  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${fmt12(S.set1Time)} & ${fmt12(S.set2Time)})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n${S.specialEvent&&S.priceTiers.length>0?S.priceTiers.map(t=>`${t.name||'Tier'}: ${t.seats} seats at $${t.price}`).join('\n'):`$${c.price} per ticket`}\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
+  let email=`Subject: Jazz Forum Arts – ${artist} – ${dates}\n\nHey ${agent},\n\nHope you're doing well.\n\nWe'd love to present ${artist} at Jazz Forum Arts for the following dates:\n\nDates: ${dates}\nSets: ${setsPerNight} x ${S.setLength}-minute sets per night (${setTimesStr(' & ')})\nVenue: Jazz Forum Arts, Tarrytown, NY (${S.seatsPerSet}-seat capacity)\n\n\nCompensation\n\n${c.dealEmailText}\n\n\nTicket Pricing\n\n${S.specialEvent&&S.priceTiers.length>0?S.priceTiers.map(t=>`${t.name||'Tier'}: ${t.seats} seats at $${t.price}`).join('\n'):`$${c.price} per ticket`}\n\n\nHospitality & Backline\n\n${backlineItems.map(b=>'• '+b).join('\n')}\n\n\nMerch\n\n${S.merchEnabled?`We sell artist-provided merch at the box office\n${S.merchVenuePct}% commission to Jazz Forum Arts`:'No merch arrangement'}\n\n\nAdditional Details\n\n${detailItems.map(d=>'• '+d).join('\n')}`;
 
   if(S.exclusivityEnabled){
     email+=`\n\n\nExclusivity\n\nStandard ${S.exclusivityDays}-day radius clause (${S.exclusivityMiles} miles)${S.exclusivityExclude?`, excluding ${S.exclusivityExclude}`:''}`;
@@ -824,7 +828,7 @@ window.generatePrint=function(){
       <tr><td>Contact</td><td style="font-family:Inter,sans-serif">${escH(S.agentName)||'TBD'}</td></tr>
       <tr><td>Date(s)</td><td style="font-family:Inter,sans-serif">${escH(S.showDate)||'TBD'}</td></tr>
       <tr><td>Venue</td><td style="font-family:Inter,sans-serif">The Jazz Forum</td></tr>
-      <tr><td>Sets</td><td style="font-family:Inter,sans-serif">${S.setLength}-min sets at ${fmt12(S.set1Time)} &amp; ${fmt12(S.set2Time)}</td></tr>
+      <tr><td>Sets</td><td style="font-family:Inter,sans-serif">${S.setLength}-min sets at ${setTimesStr(' &amp; ')}</td></tr>
       <tr><td>Schedule</td><td style="font-family:Inter,sans-serif">${nightsText}</td></tr>
       <tr><td>Capacity</td><td>${c.totalSeats} total (${S.seatsPerSet}/set)</td></tr>
       <tr><td>Doors</td><td style="font-family:Inter,sans-serif">${fmt12(S.doorsTime)}</td></tr>
