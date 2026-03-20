@@ -151,6 +151,35 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
 .tip:hover .tip-text{display:block}
 
 .section-divider{height:1px;background:var(--border-light);margin:4px 0 14px}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.toolbar .tb-current{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-sm);font-size:13px;color:var(--text-secondary)}
+.toolbar .tb-current .tb-name{font-weight:700;color:var(--text-primary);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toolbar .tb-current .tb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tb-btn{padding:8px 16px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:var(--radius-xs);transition:all .15s;white-space:nowrap}
+.tb-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.tb-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tb-btn.primary:hover{background:var(--accent-hover)}
+
+/* Library modal */
+.lib-overlay{position:fixed;inset:0;background:rgba(15,23,41,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100}
+.lib-modal{background:var(--surface);border-radius:var(--radius);padding:28px;width:90%;max-width:720px;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
+.lib-modal h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.lib-modal .lib-sub{font-size:13px;color:var(--text-muted);margin-bottom:16px}
+.lib-list{overflow-y:auto;flex:1;margin:0 -28px;padding:0 28px}
+.lib-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface-alt);border:1px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;transition:all .15s}
+.lib-item:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(59,92,255,0.08)}
+.lib-item.active{border-color:var(--accent);background:var(--accent-light)}
+.lib-item .li-info{flex:1;min-width:0}
+.lib-item .li-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib-item .li-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+.lib-item .li-net{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;white-space:nowrap}
+.lib-item .li-actions{display:flex;gap:4px}
+.lib-item .li-btn{padding:4px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text-muted);font-family:'Inter',sans-serif;transition:all .15s}
+.lib-item .li-btn:hover{border-color:var(--accent);color:var(--accent)}
+.lib-item .li-btn.danger:hover{border-color:var(--red);color:var(--red)}
+.lib-empty{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -176,6 +205,12 @@ const S = {
     { name: 'Standard', seats: 60, price: 150 },
   ],
   projectedAttendance: 85,
+  compTickets: [
+    { name: 'Board / Donors', qty: 0 },
+    { name: 'Press', qty: 0 },
+    { name: 'Artist Guest List', qty: 0 },
+  ],
+  sponsors: [],  // [{name: '', amount: 0}],
   // Deal params
   guarantee: 2000, artistPct: 70,
   doorPct: 80,
@@ -228,6 +263,197 @@ const has3Sets = () => S.friSets>=3||S.satSets>=3||S.sunSets>=3;
 const maxSets = () => Math.max(S.friSets,S.satSets,S.sunSets);
 const setTimesStr = (sep) => { let s=fmt12(S.set1Time)+sep+fmt12(S.set2Time); if(has3Sets()) s+=sep+fmt12(S.set3Time); return s; };
 
+// ── Save / Load System ──
+const STORAGE_KEY = 'jfa_offers';
+let _currentOfferId = null;
+let _lastSavedJSON = '';
+let _autoSaveTimer = null;
+
+function getOfferLibrary() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveOfferLibrary(lib) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(lib));
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function getOfferSnapshot() {
+  return JSON.parse(JSON.stringify(S));
+}
+
+function loadStateFromSnapshot(snap) {
+  // Clear S and load all keys from snapshot
+  for (const k of Object.keys(S)) delete S[k];
+  Object.assign(S, snap);
+}
+
+// Save current offer (create or update)
+window.saveOffer = function(forceNew) {
+  const lib = getOfferLibrary();
+  const c = calc();
+  const name = S.artistName || 'Untitled Offer';
+  const snap = getOfferSnapshot();
+  const meta = {
+    name: name,
+    date: S.showDate || '',
+    dealType: c.dealLabel,
+    projectedNet: c.venueNet,
+    savedAt: new Date().toISOString(),
+  };
+
+  if (_currentOfferId && !forceNew) {
+    // Update existing
+    const idx = lib.findIndex(o => o.id === _currentOfferId);
+    if (idx >= 0) {
+      lib[idx] = { ...lib[idx], ...meta, state: snap };
+      saveOfferLibrary(lib);
+      _lastSavedJSON = JSON.stringify(snap);
+      render();
+      showToast('Offer saved');
+      return;
+    }
+  }
+
+  // Create new
+  const id = generateId();
+  lib.unshift({ id, ...meta, createdAt: new Date().toISOString(), state: snap });
+  saveOfferLibrary(lib);
+  _currentOfferId = id;
+  _lastSavedJSON = JSON.stringify(snap);
+  render();
+  showToast('Offer saved');
+};
+
+// Load offer by ID
+window.loadOffer = function(id) {
+  const lib = getOfferLibrary();
+  const offer = lib.find(o => o.id === id);
+  if (!offer) { alert('Offer not found.'); return; }
+  loadStateFromSnapshot(offer.state);
+  _currentOfferId = id;
+  _lastSavedJSON = JSON.stringify(offer.state);
+  closeLibrary();
+  render();
+  showToast('Loaded: ' + (S.artistName || 'Untitled'));
+};
+
+// Delete offer
+window.deleteOffer = function(id, evt) {
+  if (evt) evt.stopPropagation();
+  if (!confirm('Delete this offer permanently?')) return;
+  let lib = getOfferLibrary();
+  lib = lib.filter(o => o.id !== id);
+  saveOfferLibrary(lib);
+  if (_currentOfferId === id) { _currentOfferId = null; _lastSavedJSON = ''; }
+  showLibrary(); // refresh the modal
+};
+
+// Duplicate offer
+window.duplicateOffer = function(id, evt) {
+  if (evt) evt.stopPropagation();
+  const lib = getOfferLibrary();
+  const src = lib.find(o => o.id === id);
+  if (!src) return;
+  const newId = generateId();
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = newId;
+  copy.name = (copy.name || 'Untitled') + ' (copy)';
+  copy.createdAt = new Date().toISOString();
+  copy.savedAt = new Date().toISOString();
+  if (copy.state) copy.state.artistName = copy.name;
+  lib.unshift(copy);
+  saveOfferLibrary(lib);
+  showLibrary(); // refresh
+  showToast('Offer duplicated');
+};
+
+// New blank offer
+window.newOffer = function() {
+  if (hasUnsavedChanges() && !confirm('You have unsaved changes. Start a new offer anyway?')) return;
+  // Reset to defaults
+  const defaults = {
+    artistName:'',agentName:'',showDate:'',dealType:'vs',
+    friday:true,saturday:true,sunday:true,
+    friSets:2,satSets:2,sunSets:2,seatsPerSet:90,
+    set1Time:'19:00',set2Time:'21:30',set3Time:'23:30',setLength:70,doorsTime:'17:50',
+    ticketPrice:45,specialEvent:false,
+    priceTiers:[{name:'Premium',seats:30,price:250},{name:'Standard',seats:60,price:150}],
+    projectedAttendance:85,
+    compTickets:[{name:'Board / Donors',qty:0},{name:'Press',qty:0},{name:'Artist Guest List',qty:0}],
+    sponsors:[],guarantee:2000,artistPct:70,doorPct:80,plusPct:70,plusGuarantee:1500,
+    expenses:[{name:'Sound / Tech',amount:300},{name:'Hospitality',amount:150},{name:'Marketing',amount:200}],
+    customExpenses:[],
+    merchEnabled:true,merchVenuePct:25,
+    merchItems:[{name:'CD',price:15,qtyPerNight:8},{name:'Vinyl',price:45,qtyPerNight:3}],
+    exclusivityEnabled:true,exclusivityDays:60,exclusivityMiles:15,exclusivityExclude:"Dizzy's Club",
+    backline:{steinway:true,bass:true,drums:true,sound:true},
+    dinner:true,greenRoom:true,soundcheck:true,parking:true,
+    hotelProvided:false,hotelNights:2,hotelRooms:[{type:'King',costPerNight:200}],
+    driverProvided:false,driverType:'Sedan',driverCost:250,driverNotes:'',
+    notes:'',showActuals:false,actualTicketsSold:0,actualTierSales:[],actualMerchSold:[]
+  };
+  loadStateFromSnapshot(defaults);
+  _currentOfferId = null;
+  _lastSavedJSON = '';
+  render();
+};
+
+function hasUnsavedChanges() {
+  if (!_currentOfferId && !S.artistName) return false; // blank state, nothing to save
+  return JSON.stringify(S) !== _lastSavedJSON;
+}
+
+// Library modal
+window.showLibrary = function() {
+  const lib = getOfferLibrary();
+  const listHTML = lib.length === 0
+    ? '<div class="lib-empty">No saved offers yet.<br>Save your first offer to start building your library.</div>'
+    : lib.map(o => {
+        const net = typeof o.projectedNet === 'number' ? o.projectedNet : 0;
+        const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
+        const dateStr = o.savedAt ? new Date(o.savedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+        const isCurrent = o.id === _currentOfferId;
+        return `<div class="lib-item ${isCurrent?'active':''}" onclick="loadOffer('${o.id}')">
+          <div class="li-info">
+            <div class="li-name">${escH(o.name||'Untitled')}</div>
+            <div class="li-meta">${escH(o.date||'No date')} &middot; ${escH(o.dealType||'')} &middot; Saved ${dateStr}</div>
+          </div>
+          <div class="li-net" style="color:${netColor}">${money(net)}</div>
+          <div class="li-actions">
+            <button class="li-btn" onclick="duplicateOffer('${o.id}',event)" title="Duplicate">Copy</button>
+            <button class="li-btn danger" onclick="deleteOffer('${o.id}',event)" title="Delete">&times;</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  $('emailModal').innerHTML = `
+    <div class="lib-overlay" onclick="if(event.target===this)closeLibrary()">
+      <div class="lib-modal">
+        <h2>Offer Library</h2>
+        <div class="lib-sub">${lib.length} saved offer${lib.length!==1?'s':''} &middot; Click to load</div>
+        <div class="lib-list">${listHTML}</div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-secondary" style="flex:1" onclick="closeLibrary()">Close</button>
+        </div>
+      </div>
+    </div>`;
+};
+window.closeLibrary = function() { $('emailModal').innerHTML = ''; };
+
+// Auto-save (debounced — saves 2 seconds after last change if offer has been saved before)
+function scheduleAutoSave() {
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  if (!_currentOfferId) return; // only auto-save if offer was previously saved
+  _autoSaveTimer = setTimeout(() => {
+    if (_currentOfferId && hasUnsavedChanges()) {
+      saveOffer(false);
+    }
+  }, 2000);
+}
+
 function calc() {
   const nights = [];
   if (S.friday) nights.push({day:'Friday',abbr:'Fri',sets:S.friSets});
@@ -236,18 +462,26 @@ function calc() {
   const totalSeatings = nights.reduce((s,n)=>s+n.sets,0);
   const totalSeats = totalSeatings * S.seatsPerSet;
   const projectedTickets = Math.round(totalSeats*S.projectedAttendance/100);
-  let grossPotential, projectedGross, price, tierDetails=[];
+
+  // ── Comp tickets & sponsor revenue ──
+  const totalComps = S.compTickets.reduce((s,c)=>s+(+c.qty||0),0);
+  const sponsorRevenue = S.sponsors.reduce((s,sp)=>s+(+sp.amount||0),0);
+  let grossPotential, projectedGross, price, tierDetails=[], compRevenueLost=0;
   if (S.specialEvent && S.priceTiers.length > 0) {
     const perSetRevenue = S.priceTiers.reduce((s,t)=>s+((+t.seats||0)*(+t.price||0)),0);
     grossPotential = perSetRevenue * totalSeatings;
-    projectedGross = Math.round(grossPotential * S.projectedAttendance / 100);
+    const avgPrice = grossPotential / totalSeats;
+    compRevenueLost = totalComps * avgPrice;
+    projectedGross = Math.round((grossPotential * S.projectedAttendance / 100) - compRevenueLost);
     const tierSeats = S.priceTiers.reduce((s,t)=>s+(+t.seats||0),0);
     price = tierSeats > 0 ? Math.round(grossPotential / totalSeats) : 0;
     tierDetails = S.priceTiers.map(t=>({name:t.name,seats:+t.seats||0,price:+t.price||0,perSet:(+t.seats||0)*(+t.price||0)}));
   } else {
     price = S.ticketPrice;
     grossPotential = totalSeats * price;
-    projectedGross = projectedTickets * price;
+    const paidTickets = Math.max(0, projectedTickets - totalComps);
+    projectedGross = paidTickets * price;
+    compRevenueLost = totalComps * price;
   }
   const baseExpenses = S.expenses.reduce((s,e)=>s+(+e.amount||0),0)+S.customExpenses.reduce((s,e)=>s+(+e.amount||0),0);
   const hotelCost = S.hotelProvided ? S.hotelRooms.reduce((s,r)=>s+((+r.costPerNight||0)*(+S.hotelNights||0)),0) : 0;
@@ -280,7 +514,7 @@ function calc() {
     dealEmailText=`$${g.toLocaleString()} guarantee + ${S.plusPct}% of net box office above breakeven`;
   }
   const venueCost=artistPay+totalExpenses;
-  const totalVenueRevenue=projectedGross+merchVenueRev;
+  const totalVenueRevenue=projectedGross+merchVenueRev+sponsorRevenue;
   const venueNet=totalVenueRevenue-venueCost;
   const breakeven=price>0?Math.ceil(venueCost/price):0;
   const breakevenPct=totalSeats>0?(breakeven/totalSeats*100):0;
@@ -322,7 +556,172 @@ function calc() {
   const actMargin = actTotalVenueRevenue>0?(actVenueNet/actTotalVenueRevenue*100):0;
   const actuals = {actGross,actTickets,actArtistPay,actMerchGross,actMerchVenueRev,actMerchArtistRev,actVenueCost,actTotalVenueRevenue,actVenueNet,actMargin};
 
-  return {nights,price,totalSeats,totalSeatings,projectedTickets,grossPotential,projectedGross,baseExpenses,hotelCost,driverCost,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue,tierDetails,actuals};
+  return {nights,totalComps,compRevenueLost,sponsorRevenue,price,totalSeats,totalSeatings,projectedTickets,grossPotential,projectedGross,baseExpenses,hotelCost,driverCost,totalExpenses,artistPay,dealLabel,dealExplain,dealEmailText,venueCost,venueNet,breakeven,breakevenPct,perTicketCost,margin,merchPerNight,merchGross,merchVenueRev,merchArtistRev,merchItemDetails,totalVenueRevenue,tierDetails,actuals};
+}
+
+// ── Artist History ──
+function getArtistHistory(name) {
+  if (!name) return [];
+  const lib = getOfferLibrary();
+  const lowerName = name.toLowerCase();
+  return lib.filter(o => {
+    const offerName = (o.state && o.state.artistName || o.name || '').toLowerCase();
+    return offerName.includes(lowerName) && offerName !== (S.artistName || '').toLowerCase();
+  }).map(o => ({
+    name: o.name || 'Untitled',
+    date: o.date || 'No date',
+    dealType: o.dealType || '',
+    projectedNet: o.projectedNet || 0,
+    state: o.state || {}
+  }));
+}
+
+// ── Season View Modal ──
+function getSeasonStats() {
+  const lib = getOfferLibrary();
+  if (lib.length === 0) return null;
+  
+  let totalShows = 0, totalNights = 0, totalTicketRev = 0, totalExpenses = 0;
+  let totalArtistPay = 0, totalSponsors = 0, totalNet = 0;
+  const items = [];
+  
+  lib.forEach(o => {
+    if (!o.state) return;
+    const c = calcFromState(o.state);
+    if (!c) return;
+    
+    totalShows++;
+    totalNights += c.nights.length;
+    totalTicketRev += c.projectedGross;
+    totalExpenses += c.totalExpenses;
+    totalArtistPay += c.artistPay;
+    totalSponsors += c.sponsorRevenue || 0;
+    totalNet += c.venueNet;
+    
+    const margin = c.totalVenueRevenue > 0 ? (c.venueNet / c.totalVenueRevenue * 100) : 0;
+    const avgAtt = c.totalSeats > 0 ? Math.round(c.projectedTickets / c.totalSeats * 100) : 0;
+    items.push({
+      name: o.name || 'Untitled',
+      date: o.date || 'N/A',
+      dealType: c.dealLabel || '',
+      gross: c.projectedGross,
+      expenses: c.totalExpenses,
+      net: c.venueNet,
+      margin: margin,
+      attendance: avgAtt
+    });
+  });
+  
+  items.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  const avgAtt = totalNights > 0 ? Math.round(totalTicketRev / (totalShows * Math.max(1, totalNights/totalShows))) : 0;
+  const avgMargin = totalTicketRev > 0 ? (totalNet / totalTicketRev * 100) : 0;
+  
+  return {
+    totalShows, totalNights, totalTicketRev, totalExpenses, totalArtistPay,
+    totalSponsors, totalNet, avgMargin, items
+  };
+}
+
+function calcFromState(state) {
+  // Temporarily swap state, calc, restore
+  const oldS = JSON.parse(JSON.stringify(S));
+  for (const k of Object.keys(S)) delete S[k];
+  Object.assign(S, state);
+  const result = calc();
+  for (const k of Object.keys(S)) delete S[k];
+  Object.assign(S, oldS);
+  return result;
+}
+
+window.showSeasonView = function() {
+  const stats = getSeasonStats();
+  if (!stats) {
+    alert('No saved offers yet.');
+    return;
+  }
+  
+  const itemsHTML = stats.items.map(item => `
+    <tr style="border-top:1px solid var(--border-light)">
+      <td style="padding:10px 0;color:var(--text-secondary)">${escH(item.name)}</td>
+      <td style="padding:10px 0;color:var(--text-muted);font-size:12px">${escH(item.date)}</td>
+      <td style="padding:10px 0;color:var(--text-muted);font-size:12px">${escH(item.dealType)}</td>
+      <td style="padding:10px 0;text-align:right;font-family:'DM Mono',monospace;font-weight:600">${money(item.gross)}</td>
+      <td style="padding:10px 0;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:var(--text-secondary)">${money(item.expenses)}</td>
+      <td style="padding:10px 0;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:${item.net >= 0 ? 'var(--green)' : 'var(--red)'}">${money(item.net)}</td>
+      <td style="padding:10px 0;text-align:right;color:${item.margin >= 0 ? 'var(--green)' : 'var(--red)'}">​${item.margin.toFixed(1)}%</td>
+    </tr>
+  `).join('');
+  
+  const html = `
+    <div class="lib-overlay" onclick="if(event.target===this)closeSeasonView()">
+      <div class="lib-modal" style="width:95%;max-width:1000px">
+        <h2>Season Budget View</h2>
+        <div class="lib-sub">Aggregate stats across all ${stats.totalShows} saved offer${stats.totalShows!==1?'s':''}</div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin:20px 0">
+          <div style="background:var(--surface-alt);padding:16px;border-radius:var(--radius-sm);text-align:center">
+            <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:700;color:var(--accent)">${stats.totalShows}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Total Shows</div>
+          </div>
+          <div style="background:var(--surface-alt);padding:16px;border-radius:var(--radius-sm);text-align:center">
+            <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:700;color:var(--accent)">${stats.totalNights}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Total Nights</div>
+          </div>
+          <div style="background:var(--surface-alt);padding:16px;border-radius:var(--radius-sm);text-align:center">
+            <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:700">${money(stats.totalTicketRev)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Total Ticket Revenue</div>
+          </div>
+          <div style="background:var(--surface-alt);padding:16px;border-radius:var(--radius-sm);text-align:center">
+            <div style="font-family:'DM Mono',monospace;font-size:24px;font-weight:700;color:var(--green)">${pct(stats.avgMargin)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Avg. Margin</div>
+          </div>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 20px 0">
+          <div style="background:var(--surface-alt);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Total Artist Pay</div>
+            <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;margin-top:4px">${money(stats.totalArtistPay)}</div>
+          </div>
+          <div style="background:var(--surface-alt);padding:12px;border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Total Net (Venue)</div>
+            <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${stats.totalNet >= 0 ? 'var(--green)' : 'var(--red)'};margin-top:4px">${money(stats.totalNet)}</div>
+          </div>
+        </div>
+        
+        <div style="overflow-x:auto;margin:16px 0">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border)">
+                <th style="text-align:left;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Artist</th>
+                <th style="text-align:left;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Date</th>
+                <th style="text-align:left;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Deal</th>
+                <th style="text-align:right;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Gross</th>
+                <th style="text-align:right;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Exp</th>
+                <th style="text-align:right;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Net</th>
+                <th style="text-align:right;padding:10px 0;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+        </div>
+        
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-secondary" style="flex:1" onclick="printSeasonView()">Print Season Report</button>
+          <button class="btn-secondary" style="flex:1" onclick="closeSeasonView()">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+  $('emailModal').innerHTML = html;
+}
+
+window.closeSeasonView = function() { $('emailModal').innerHTML = ''; };
+
+function printSeasonView() {
+  window.print();
 }
 
 function render(){
@@ -341,6 +740,19 @@ function render(){
         <h1>Artist Offer Calculator</h1>
         <div class="subtitle">Jazz Forum Arts &middot; 90 Seats &middot; Tarrytown, NY</div>
       </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tb-current">
+        <div class="tb-dot" style="background:${_currentOfferId ? (hasUnsavedChanges()?'var(--yellow)':'var(--green)') : 'var(--text-muted)'}"></div>
+        <span class="tb-name">${S.artistName ? escH(S.artistName) : 'New Offer'}</span>
+        <span style="font-size:11px;color:var(--text-muted)">${_currentOfferId ? (hasUnsavedChanges()?'(unsaved changes)':'(saved)') : '(not saved)'}</span>
+      </div>
+      <button class="tb-btn primary" onclick="saveOffer(false)">Save</button>
+      <button class="tb-btn" onclick="saveOffer(true)">Save As New</button>
+      <button class="tb-btn" onclick="showLibrary()">Library (${getOfferLibrary().length})</button>
+      <button class="tb-btn" onclick="showSeasonView()">Season View</button>
+      <button class="tb-btn" onclick="newOffer()">New Offer</button>
     </div>
 
     <div class="grid">
@@ -418,6 +830,24 @@ function render(){
           <label>Projected attendance <span class="tip"><span class="tip-icon">?</span><span class="tip-text">Expected % of seats sold. 85% is typical for JFA weekends.</span></span></label>
           <input type="range" min="30" max="100" value="${S.projectedAttendance}" oninput="S.projectedAttendance=+this.value;render()">
           <div class="attendance-display"><div class="big">${S.projectedAttendance}%</div><div class="sub">${c.projectedTickets} of ${c.totalSeats} seats</div></div>
+
+        <div class="card">
+          <div class="card-title">Comp Tickets</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:2;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Category</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Qty</div>
+            <div style="flex:0 0 28px"></div>
+          </div>
+          ${S.compTickets.map((ct,i)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="text" value="${esc(ct.name)}" onchange="S.compTickets[${i}].name=this.value" placeholder="Category" style="flex:2">
+            <input type="number" value="${ct.qty}" onchange="S.compTickets[${i}].qty=+this.value;render()" placeholder="0" style="flex:1">
+            ${S.compTickets.length>1?`<button class="expense-remove" onclick="S.compTickets.splice(${i},1);render()">×</button>`:'<span style="flex:0 0 28px"></span>'}
+          </div>
+          `).join('')}
+          <button class="expense-add" onclick="S.compTickets.push({name:'',qty:0});render()">+ Add category</button>
+          ${(()=>{const tc=S.compTickets.reduce((s,c)=>s+(+c.qty||0),0);return tc>0?`<div style="margin-top:12px;padding:10px 14px;background:var(--yellow-bg);border-radius:var(--radius-xs);font-size:13px;color:var(--text-secondary)"><strong>${tc} comp ticket${tc>1?'s':''}</strong> (${money(S.specialEvent && S.priceTiers.length > 0 ? tc * (S.priceTiers.reduce((s,t)=>s+((+t.seats||0)*(+t.price||0)),0) / S.seatsPerSet) : tc*S.ticketPrice)} revenue impact)</div>`:'';})()}
+        </div>
         </div>
 
         <div class="card">
@@ -426,7 +856,26 @@ function render(){
           ${S.customExpenses.map((e,i)=>`<div class="expense-row"><input type="text" value="${esc(e.name)}" onchange="S.customExpenses[${i}].name=this.value" placeholder="Name" style="max-width:110px"><input type="number" value="${e.amount}" onchange="S.customExpenses[${i}].amount=+this.value;render()"><button class="expense-remove" onclick="S.customExpenses.splice(${i},1);render()">&times;</button></div>`).join('')}
           <button class="expense-add" onclick="S.customExpenses.push({name:'',amount:0});render()">+ Add line item</button>
           <div class="expense-total"><span>Total</span><span class="et-val">${money(c.totalExpenses)}</span></div>
+        <
+        <div class="card">
+          <div class="card-title">Sponsors &amp; Grants</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:2;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Name</div>
+            <div style="flex:1;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Amount</div>
+            <div style="flex:0 0 28px"></div>
+          </div>
+          ${S.sponsors.map((sp,i)=>`
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="text" value="${esc(sp.name)}" onchange="S.sponsors[${i}].name=this.value" placeholder="e.g. Arts Foundation" style="flex:2">
+            <input type="number" value="${sp.amount}" onchange="S.sponsors[${i}].amount=+this.value;render()" placeholder="$" style="flex:1">
+            ${S.sponsors.length>0?`<button class="expense-remove" onclick="S.sponsors.splice(${i},1);render()">×</button>`:'<span style="flex:0 0 28px"></span>'}
+          </div>
+          `).join('')}
+          <button class="expense-add" onclick="S.sponsors.push({name:'',amount:0});render()">+ Add sponsor</button>
+          ${(()=>{const sr=S.sponsors.reduce((s,sp)=>s+(+sp.amount||0),0);return sr>0?`<div style="margin-top:12px;padding:10px 14px;background:var(--green-bg);border-radius:var(--radius-xs);font-size:13px;color:var(--text-secondary)"><strong>${money(sr)}</strong> in sponsor/grant revenue</div>`:'';})()}
         </div>
+
+/div>
 
         <!-- Merch & Terms -->
         <div class="card">
@@ -491,6 +940,20 @@ function render(){
       <!-- ═══ RIGHT ═══ -->
       <div>
         <div class="card">
+          <div class="card-title">Artist History</div>
+          ${(()=>{const hist=getArtistHistory(S.artistName);return hist.length>0?`
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${hist.slice(0,5).map(h=>`
+            <div style="padding:10px 12px;background:var(--surface-alt);border-radius:var(--radius-xs);font-size:12px;border-left:3px solid var(--accent)">
+              <div style="font-weight:600;color:var(--text-primary)">${escH(h.date)}</div>
+              <div style="color:var(--text-secondary);font-size:11px;margin-top:2px">${escH(h.dealType)} &middot; <span style="color:${h.projectedNet>=0?'var(--green)':'var(--red)'};font-weight:600">${money(h.projectedNet)}</span></div>
+            </div>
+            `).join('')}
+          </div>
+          `:`<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">No previous bookings<br>for this artist.</div>`})()}
+        </div>
+
+        <div class="card">
           <div class="card-title">Deal Structure</div>
           <div class="deal-grid">
             <button class="deal-btn ${S.dealType==='flat'?'active':''}" onclick="S.dealType='flat';render()">Flat Guarantee<span class="deal-sub">Fixed fee</span></button>
@@ -529,6 +992,7 @@ function render(){
           <div class="card-title">Financial Projection</div>
           <div class="result-block">
             <div class="r-row"><span class="r-label">Ticket revenue</span><span class="r-value">${money(c.projectedGross)}</span></div>
+            ${c.sponsorRevenue>0?`<div class="r-row"><span class="r-label">Sponsor/Grant revenue</span><span class="r-value c-green">+${money(c.sponsorRevenue)}</span></div>`:``}
             ${c.merchVenueRev>0?`<div class="r-row"><span class="r-label">Merch commission (${S.merchVenuePct}%)</span><span class="r-value c-green">+${money(c.merchVenueRev)}</span></div>`:''}
             ${c.merchVenueRev>0?`<div class="r-row" style="font-weight:600"><span class="r-label">Total venue revenue</span><span class="r-value">${money(c.totalVenueRevenue)}</span></div>`:''}
             <div class="r-row"><span class="r-label">Artist payment</span><span class="r-value c-red">-${money(c.artistPay)}</span></div>
@@ -732,6 +1196,9 @@ function render(){
         <button class="btn-secondary" onclick="generatePrint()">Print / PDF Summary</button>
       </div>
     </div>`;
+
+  // Trigger auto-save for previously saved offers
+  scheduleAutoSave();
 }
 
 function esc(s){return(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
