@@ -533,8 +533,8 @@ function calc() {
   let artistPay=0,dealLabel='',dealExplain='',dealEmailText='';
   if(S.dealType==='flat'){
     artistPay=+S.guarantee||0; dealLabel='Flat Guarantee';
-    dealExplain=`Fixed fee of <strong>${money(artistPay)}</strong> paid regardless of ticket sales.`;
-    dealEmailText=`$${artistPay.toLocaleString()} per night`;
+    dealExplain=`Fixed fee of <strong>${money(artistPay)}</strong> for the engagement, paid regardless of ticket sales.`;
+    dealEmailText=`$${artistPay.toLocaleString()} flat guarantee for the engagement`;
   }else if(S.dealType==='vs'){
     const ps=projectedGross*(S.artistPct/100),g=+S.guarantee||0;
     artistPay=Math.max(g,ps); dealLabel='VS Deal';
