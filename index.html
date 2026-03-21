@@ -859,6 +859,7 @@ function render(){
               <span style="font-size:12px">Different times per day</span>
             </div>
           </div>
+          </div>
         </div>
 
         <div class="card">
@@ -1156,7 +1157,7 @@ function render(){
         </div>
 
         <!-- Per-Night Breakdown -->
-        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100),nightRev=S.specialEvent&&c.tierDetails.length>0?Math.round(c.tierDetails.reduce((s,t)=>s+t.perSet,0)*n.sets*S.projectedAttendance/100):nt*c.price;return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nightRev)}</span></div>`;}).join('')}</div></div></div>`:''}
+        ${c.nights.length>1?`<div class="card"><div class="card-title">Per-Night Breakdown</div><div class="result-block">${c.nights.map(n=>{const ns=n.sets*S.seatsPerSet,nt=Math.round(ns*S.projectedAttendance/100),nightRev=S.specialEvent&&c.tierDetails.length>0?Math.round(c.tierDetails.reduce((s,t)=>s+t.perSet,0)*n.sets*S.projectedAttendance/100):nt*c.price;return`<div class="r-row"><span class="r-label">${n.day} &middot; ${n.sets} set${n.sets>1?'s':''} &times; ${S.seatsPerSet}</span><span class="r-value">${nt} tix &middot; ${money(nightRev)}</span></div>`;}).join('')}</div></div>`:''}
 
         <!-- Backline & Hospitality -->
         <div class="card collapsible ${secOpen('logistics')?'sec-open':''}">
