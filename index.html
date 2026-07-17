@@ -546,16 +546,16 @@ function calc() {
     artistPay=Math.max(g,ps); dealLabel='VS Deal';
     const w=ps>g?'percentage wins':'guarantee wins';
     dealExplain=`<strong>${money(g)}</strong> guarantee <em>vs</em> <strong>${S.artistPct}%</strong> of gross (<strong>${money(ps)}</strong>). <strong>${w}</strong>.`;
-    dealEmailText=`$${g.toLocaleString()} vs. ${S.artistPct}% of net box office, whichever is greater`;
+    dealEmailText=`$${g.toLocaleString()} vs. ${S.artistPct}% of gross box office, whichever is greater`;
   }else if(S.dealType==='door'){
     artistPay=projectedGross*(S.doorPct/100); dealLabel='Door Split';
     dealExplain=`No guarantee. Artist receives <strong>${S.doorPct}%</strong> of gross ticket revenue.`;
-    dealEmailText=`${S.doorPct}/${100-S.doorPct} split in favor of the artist after expenses`;
+    dealEmailText=`${S.doorPct}/${100-S.doorPct} split of gross box office in favor of the artist`;
   }else if(S.dealType==='plus'){
     const g=+S.plusGuarantee||0,be=g+totalExpenses,ov=Math.max(0,projectedGross-be),bonus=ov*(S.plusPct/100);
     artistPay=g+bonus; dealLabel='Plus Deal';
     dealExplain=`<strong>${money(g)}</strong> guarantee <em>plus</em> <strong>${S.plusPct}%</strong> above breakeven (<strong>${money(be)}</strong>). Bonus: <strong>${money(bonus)}</strong>.`;
-    dealEmailText=`$${g.toLocaleString()} guarantee + ${S.plusPct}% of net box office above breakeven`;
+    dealEmailText=`$${g.toLocaleString()} guarantee + ${S.plusPct}% of gross box office above breakeven`;
   }
   const venueCost=artistPay+totalExpenses;
   const totalVenueRevenue=projectedGross+merchVenueRev+sponsorRevenue;
