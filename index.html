@@ -212,18 +212,18 @@ const S = {
   dealType: 'vs',
   friday: true, saturday: true, sunday: true,
   friSets: 2, satSets: 2, sunSets: 2,
-  seatsPerSet: 90,
+  seatsPerSet: 85,
   // Set times
-  set1Time: '19:00', set2Time: '21:30', set3Time: '23:30', setLength: 70,
-  doorsTime: '17:50',
+  set1Time: '19:00', set2Time: '21:00', set3Time: '23:30', setLength: 60,
+  doorsTime: '17:40',
   customDayTimes: false,
   dayTimes: {
-    fri: { set1: '19:00', set2: '21:30', set3: '23:30', doors: '17:50' },
-    sat: { set1: '19:00', set2: '21:30', set3: '23:30', doors: '17:50' },
-    sun: { set1: '17:00', set2: '19:30', set3: '', doors: '15:50' },
+    fri: { set1: '19:00', set2: '21:00', set3: '23:30', doors: '17:40' },
+    sat: { set1: '19:00', set2: '21:00', set3: '23:30', doors: '17:40' },
+    sun: { set1: '19:00', set2: '21:00', set3: '', doors: '17:40' },
   },
   // Pricing
-  ticketPrice: 45, specialEvent: false,
+  ticketPrice: 35, specialEvent: false,
   priceTiers: [
     { name: 'Premium', seats: 30, price: 250 },
     { name: 'Standard', seats: 60, price: 150 },
@@ -419,11 +419,11 @@ window.newOffer = function() {
   const defaults = {
     artistName:'',agentName:'',showDate:'',dealType:'vs',
     friday:true,saturday:true,sunday:true,
-    friSets:2,satSets:2,sunSets:2,seatsPerSet:90,
-    set1Time:'19:00',set2Time:'21:30',set3Time:'23:30',setLength:70,doorsTime:'17:50',
+    friSets:2,satSets:2,sunSets:2,seatsPerSet:85,
+    set1Time:'19:00',set2Time:'21:00',set3Time:'23:30',setLength:60,doorsTime:'17:40',
     customDayTimes:false,
-    dayTimes:{fri:{set1:'19:00',set2:'21:30',set3:'23:30',doors:'17:50'},sat:{set1:'19:00',set2:'21:30',set3:'23:30',doors:'17:50'},sun:{set1:'17:00',set2:'19:30',set3:'',doors:'15:50'}},
-    ticketPrice:45,specialEvent:false,
+    dayTimes:{fri:{set1:'19:00',set2:'21:00',set3:'23:30',doors:'17:40'},sat:{set1:'19:00',set2:'21:00',set3:'23:30',doors:'17:40'},sun:{set1:'19:00',set2:'21:00',set3:'',doors:'17:40'}},
+    ticketPrice:35,specialEvent:false,
     priceTiers:[{name:'Premium',seats:30,price:250},{name:'Standard',seats:60,price:150}],
     projectedAttendance:85,
     compTickets:[{name:'Board / Donors',qty:0},{name:'Press',qty:0},{name:'Artist Guest List',qty:0}],
@@ -782,7 +782,7 @@ function render(){
       </div>
       <div class="header-text">
         <h1>Artist Offer Calculator</h1>
-        <div class="subtitle">Jazz Forum Arts &middot; 90 Seats &middot; Tarrytown, NY</div>
+        <div class="subtitle">Jazz Forum Arts &middot; 85 Seats &middot; Tarrytown, NY</div>
       </div>
     </div>
 
@@ -1175,11 +1175,11 @@ function render(){
           </div>
           <div class="section-divider" style="margin-top:14px"></div>
           <div class="check-group" style="margin-top:0">
-            <div class="check-item ${S.dinner?'active':''}" onclick="S.dinner=!S.dinner;render()" style="padding:8px 10px"><input type="checkbox" ${S.dinner?'checked':''} onclick="event.stopPropagation();S.dinner=this.checked;render()"><span style="font-size:12px">Dinner</span></div>
+            <div class="check-item ${S.dinner?'active':''}" onclick="S.dinner=!S.dinner;render()" style="padding:8px 10px"><input type="checkbox" ${S.dinner?'checked':''} onclick="event.stopPropagation();S.dinner=this.checked;render()"><span style="font-size:12px">Dinner between sets</span></div>
             <div class="check-item ${S.greenRoom?'active':''}" onclick="S.greenRoom=!S.greenRoom;render()" style="padding:8px 10px"><input type="checkbox" ${S.greenRoom?'checked':''} onclick="event.stopPropagation();S.greenRoom=this.checked;render()"><span style="font-size:12px">Green Room</span></div>
           </div>
           <div class="check-group" style="margin-top:6px">
-            <div class="check-item ${S.soundcheck?'active':''}" onclick="S.soundcheck=!S.soundcheck;render()" style="padding:8px 10px"><input type="checkbox" ${S.soundcheck?'checked':''} onclick="event.stopPropagation();S.soundcheck=this.checked;render()"><span style="font-size:12px">Soundcheck</span></div>
+            <div class="check-item ${S.soundcheck?'active':''}" onclick="S.soundcheck=!S.soundcheck;render()" style="padding:8px 10px"><input type="checkbox" ${S.soundcheck?'checked':''} onclick="event.stopPropagation();S.soundcheck=this.checked;render()"><span style="font-size:12px">Soundcheck: 4–5:15 PM sharp</span></div>
             <div class="check-item ${S.parking?'active':''}" onclick="S.parking=!S.parking;render()" style="padding:8px 10px"><input type="checkbox" ${S.parking?'checked':''} onclick="event.stopPropagation();S.parking=this.checked;render()"><span style="font-size:12px">Parking</span></div>
           </div>
 
@@ -1269,12 +1269,12 @@ function render(){
 
         <div class="card collapsible ${secOpen('notes')?'sec-open':''}">
           <div class="sec-header" onclick="toggleSec('notes')">
-            <div class="card-title">Offer Notes</div>
+            <div class="card-title">Internal Notes</div>
             <span class="sec-summary">${S.notes?S.notes.split('\n')[0].substring(0,40)+'...':'Add notes'}</span>
             ${chevron('notes')}
           </div>
           <div class="sec-body ${secOpen('notes')?'open':''}">
-          <textarea onchange="S.notes=this.value" placeholder="Additional terms, rider requests, travel arrangements...">${esc(S.notes)}</textarea>
+          <textarea onchange="S.notes=this.value" placeholder="Internal planning notes — not included in the email offer">${esc(S.notes)}</textarea>
           </div>
         </div>
 
@@ -1319,7 +1319,8 @@ const chevron=key=>`<svg class="sec-chevron ${secOpen(key)?'open':''}" viewBox="
 window.generateEmail=function(){
   const c=calc();
   const artist=S.artistName||'[Artist Name]';
-  const agent=S.agentName||'[Agent Name]';
+  // Keep agency and contact details out of the greeting.
+  const agent=(S.agentName||'').trim().split(/\s+/)[0]||'[Agent Name]';
   const dates=S.showDate||'[Dates]';
   const nightsCount=c.nights.length;
   const setsPerNight=c.nights.length>0?c.nights[0].sets:2;
@@ -1335,7 +1336,7 @@ window.generateEmail=function(){
   const detailItems=[];
   if(S.customDayTimes) detailItems.push(`Doors: ${c.nights.map(n=>`${n.abbr} ${fmt12(getDayTimes(n.day).doors)}`).join(', ')}`);
   else detailItems.push(`Doors: ${fmt12(S.doorsTime)}`);
-  if(S.soundcheck) detailItems.push('Soundcheck: coordinated in advance');
+  if(S.soundcheck) detailItems.push('Soundcheck: 4:00–5:15 PM (ends promptly at 5:15 PM)');
   if(S.parking) detailItems.push('Parking available onsite');
   if(S.hotelProvided) {
     const roomDesc = S.hotelRooms.length===1 ? `1 ${S.hotelRooms[0].type} room` : S.hotelRooms.map((r,i)=>`${r.type}`).join(', ')+` (${S.hotelRooms.length} rooms)`;
@@ -1349,9 +1350,7 @@ window.generateEmail=function(){
     email+=`\n\n\nExclusivity\n\nStandard ${S.exclusivityDays}-day radius clause (${S.exclusivityMiles} miles)${S.exclusivityExclude?`, excluding ${S.exclusivityExclude}`:''}`;
   }
 
-  if(S.notes){
-    email+=`\n\n\nAdditional Notes\n\n${S.notes}`;
-  }
+  // S.notes is internal planning context and must not enter an artist email.
 
   email+=`\n\nLet me know if this works for you and we can move forward with a contract.\n\nLooking forward to having you with us.\n\nBest,\nDarrian`;
 
@@ -1446,7 +1445,7 @@ window.generatePrint=function(){
     </table>
     <table style="margin-top:8px"><tr><td>Breakeven</td><td>${c.breakeven} tickets (${pct(c.breakevenPct)})</td></tr></table>
 
-    ${S.notes?`<h3>Additional Terms</h3><div class="os-notes">${escH(S.notes).replace(/\n/g,'<br>')}</div>`:''}
+    ${S.notes?`<h3>Internal Notes (not included in email)</h3><div class="os-notes">${escH(S.notes).replace(/\n/g,'<br>')}</div>`:''}
 
     ${S.showActuals?`
     <h3>Post-Show Actuals</h3>
